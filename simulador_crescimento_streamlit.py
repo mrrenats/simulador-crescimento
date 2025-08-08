@@ -4,11 +4,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import re
 
-st.title("Simulador de Juros Compostos • Ciclos Personalizados (v2)")
+st.title("Simulador de Juros Compostos • Ciclos Personalizados (v3)")
 
 # ===== Utilidades =====
 def parse_percent_br(pct_str: str) -> float:
-    """Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85)."""
+    \"\\"Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85).\\"\\"
     if not isinstance(pct_str, str):
         raise ValueError("Percentual inválido: informe texto como '12,34%'.")
     s = pct_str.strip().replace(" ", "")
@@ -23,7 +23,7 @@ def parse_percent_br(pct_str: str) -> float:
     return fator
 
 def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dias_perda: int, comeca_por: str):
-    """Monta a lista de multiplicadores do ciclo conforme parâmetros."""
+    \"\\"Monta a lista de multiplicadores do ciclo conforme parâmetros.\\"\\"
     fator_ganho = parse_percent_br(ganho_pct_str)
     fator_perda = parse_percent_br(perda_pct_str)
 
@@ -42,17 +42,51 @@ def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dia
     return ciclo
 
 def simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
+    # Retorna apenas os dias com operação aplicada
     valor = valor_inicial
     data_atual = data_inicio
-    historico = [{"Data": data_atual, "Valor": valor}]
+    historico = []
     ciclo_index = 0
+
     while data_atual <= data_fim:
         if data_atual.weekday() in dias_ativos and len(ciclo) > 0:
-            valor *= ciclo[ciclo_index]
+            fator = ciclo[ciclo_index]
+            valor_ant = valor
+            valor = valor * fator
             ciclo_index = (ciclo_index + 1) % len(ciclo)
-        historico.append({"Data": data_atual, "Valor": valor})
+
+            variacao_pct = (fator - 1.0) * 100.0
+            tipo = "Ganho" if variacao_pct > 0 else ("Perda" if variacao_pct < 0 else "Neutro")
+
+            historico.append({
+                "Data": data_atual,  # manter datetime para gráfico; formatar para tabela depois
+                "Tipo": tipo,
+                "Variação (%)": variacao_pct,
+                "Valor (R$)": valor
+            })
         data_atual += timedelta(days=1)
-    return pd.DataFrame(historico)
+
+    df = pd.DataFrame(historico)
+    return df
+
+def formatar_df_br(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    # Formatar data no padrão brasileiro para a tabela
+    out["Data"] = out["Data"].dt.strftime("%d/%m/%Y")
+    # Formatar variação e valor em PT-BR
+    out["Variação (%)"] = out["Variação (%)"].map(lambda v: f"{v:,.2f}%".replace(",", "X").replace(".", ",").replace("X", "."))
+    out["Valor (R$)"] = out["Valor (R$)"].map(lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    return out
+
+def colorir_linhas(row):
+    # Recebe linha com colunas formatadas; usa 'Tipo'
+    if row.get("Tipo") == "Ganho":
+        return ["background-color: #e6ffe6"] * len(row)  # verde claro
+    if row.get("Tipo") == "Perda":
+        return ["background-color: #ffe6e6"] * len(row)  # vermelho claro
+    return [""] * len(row)
 
 # ===== Entradas =====
 col1, col2 = st.columns(2)
@@ -62,19 +96,23 @@ with col1:
 with col2:
     data_fim = st.date_input("Data de fim", value=datetime(2025, 12, 31))
 
-st.subheader("Dias úteis com operações")
+st.subheader("Dias com operações")
 dias_ativos = []
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 with c1:
-    if st.checkbox("Segunda", value=True): dias_ativos.append(0)
+    if st.checkbox("Seg", value=True): dias_ativos.append(0)
 with c2:
-    if st.checkbox("Terça", value=True): dias_ativos.append(1)
+    if st.checkbox("Ter", value=True): dias_ativos.append(1)
 with c3:
-    if st.checkbox("Quarta", value=False): dias_ativos.append(2)
+    if st.checkbox("Qua", value=False): dias_ativos.append(2)
 with c4:
-    if st.checkbox("Quinta", value=True): dias_ativos.append(3)
+    if st.checkbox("Qui", value=True): dias_ativos.append(3)
 with c5:
-    if st.checkbox("Sexta", value=False): dias_ativos.append(4)
+    if st.checkbox("Sex", value=False): dias_ativos.append(4)
+with c6:
+    if st.checkbox("Sáb", value=False): dias_ativos.append(5)
+with c7:
+    if st.checkbox("Dom", value=False): dias_ativos.append(6)
 
 st.subheader("Ciclo de ganhos e perdas")
 ciclo_col1, ciclo_col2, ciclo_col3 = st.columns([1,1,1])
@@ -88,7 +126,7 @@ with ciclo_col3:
 dias_ganho = st.number_input("Quantidade de dias de ganho no ciclo", min_value=0, value=2, step=1)
 dias_perda = st.number_input("Quantidade de dias de perda no ciclo", min_value=0, value=1, step=1)
 
-st.caption("Ex.: para um ciclo de 2 dias de ganho e 1 dia de perda, informe ganho=2 e perda=1. O ciclo repetirá nessa ordem, iniciando pelo item escolhido acima.")
+st.caption("Monte o ciclo livremente. Ex.: 2 ganhos e 1 perda, iniciando por 'Ganho'.")
 
 erro = None
 ciclo = []
@@ -100,13 +138,21 @@ except Exception as e:
     st.error(erro)
 
 if st.button("Simular") and not erro:
-    df = simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
-    st.line_chart(df.set_index("Data"))
-    st.dataframe(df)
-    st.download_button("📥 Baixar CSV", data=df.to_csv(index=False), file_name="simulacao.csv", mime="text/csv")
+    df_ops = simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
 
-    valor_final = df["Valor"].iloc[-1]
-    st.success("Valor final em {}: R$ {}".format(
-        df["Data"].iloc[-1].strftime('%d/%m/%Y'),
-        ("{:,.2f}".format(valor_final)).replace(",", "X").replace(".", ",").replace("X", ".")
-    ))
+    if df_ops.empty:
+        st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
+    else:
+        # Gráfico: usar apenas dias com operação
+        df_chart = df_ops[["Data", "Valor (R$)"]].copy().set_index("Data")
+        st.line_chart(df_chart)
+
+        # Tabela formatada em PT-BR e colorida por linha
+        df_br = formatar_df_br(df_ops)
+        styler = df_br.style.apply(colorir_linhas, axis=1)
+        st.dataframe(styler, use_container_width=True)
+
+        # Resumo final
+        valor_final = df_ops["Valor (R$)"].iloc[-1]
+        data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
+        st.success(f"Valor final em {data_final}: R$ {valor_final:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
