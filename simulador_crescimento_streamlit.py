@@ -1,4 +1,3 @@
-
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -15,6 +14,7 @@ st.title(APP_TITLE)
 
 # ---------- Utilidades ----------
 def parse_percent_br(pct_str: str) -> float:
+    """Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85)."""
     if not isinstance(pct_str, str):
         raise ValueError("Percentual inválido: informe texto como '12,34%'.")
     s = pct_str.strip().replace(" ", "")
@@ -28,12 +28,14 @@ def parse_percent_br(pct_str: str) -> float:
     return 1 + (valor / 100.0)
 
 def parse_data_br(txt: str) -> datetime:
+    """Recebe 'dd/mm/aaaa' e retorna datetime; lança ValueError se inválida."""
     s = (txt or "").strip()
-    if not re.fullmatch(r"\\d{2}/\\d{2}/\\d{4}", s):
+    if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", s):
         raise ValueError("Use o formato dd/mm/aaaa, ex.: 07/08/2025.")
     return datetime.strptime(s, "%d/%m/%Y")
 
 def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dias_perda: int, comeca_por: str):
+    """Monta a lista de multiplicadores do ciclo conforme parâmetros."""
     fator_ganho = parse_percent_br(ganho_pct_str)
     fator_perda = parse_percent_br(perda_pct_str)
     if dias_ganho < 0 or dias_perda < 0:
@@ -49,6 +51,7 @@ def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dia
     return ciclo
 
 def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
+    """Retorna SOMENTE os dias com operação aplicada; sem dias parados."""
     valor = valor_inicial
     data_atual = data_inicio
     historico = []
@@ -73,8 +76,9 @@ def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
 
 def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
+    """Gera HTML da tabela com linha inicial + dias com operação; com cores por linha."""
     linhas = []
-    linhas.append(\"\"\"\
+    linhas.append("""
     <thead>
       <tr>
         <th style="text-align:left;padding:6px;">Data</th>
@@ -83,41 +87,40 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
         <th style="text-align:right;padding:6px;">Valor (R$)</th>
       </tr>
     </thead>
-    \"\"\"\
-    )
-    linhas.append(f\"\"\"\
+    """)
+    linhas.append(f"""
     <tr style="background-color:#f0f0f0;">
       <td style="padding:6px;">{data_inicio.strftime('%d/%m/%Y')}</td>
       <td style="padding:6px;">Inicial</td>
       <td style="text-align:right;padding:6px;">-</td>
       <td style="text-align:right;padding:6px;">R$ {br_num(valor_inicial)}</td>
     </tr>
-    \"\"\")
+    """)
     if not df_ops.empty:
         for _, r in df_ops.iterrows():
             cor = "#e6ffe6" if r["Tipo"] == "Ganho" else ("#ffe6e6" if r["Tipo"] == "Perda" else "#ffffff")
             data_br = pd.to_datetime(r["Data"]).strftime("%d/%m/%Y")
             var_br = f"{br_num(r['Variação (%)'])}%"
             val_br = f"R$ {br_num(r['Valor (R$)'])}"
-            linhas.append(f\"\"\"\
+            linhas.append(f"""
             <tr style="background-color:{cor};">
               <td style="padding:6px;">{data_br}</td>
               <td style="padding:6px;">{r['Tipo']}</td>
               <td style="text-align:right;padding:6px;">{var_br}</td>
               <td style="text-align:right;padding:6px;">{val_br}</td>
             </tr>
-            \"\"\")
-    html = f\"\"\"\
+            """)
+    html = f"""
     <div style="overflow-x:auto;width:100%;max-width:100%;">
       <table style="border-collapse:collapse;width:100%;max-width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
         {''.join(linhas)}
       </table>
     </div>
-    \"\"\"
+    """
     return html
 
 # ---------- Entradas ----------
-# Data atual BR como default de início; fim em branco
+# Data de início = hoje (BR); data de fim vazia
 hoje = datetime.now().strftime("%d/%m/%Y")
 
 st.subheader("Período e valor inicial")
@@ -212,8 +215,8 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
             ax.imshow(bg_img, extent=(0, 1, 0, 1), transform=ax.transAxes, zorder=0)
             line_color = "white"
         else:
-            ax.set_facecolor("#111111")  # fundo escuro para dar contraste
-            line_color = "black"         # linha preta p/ contraste no fundo escuro
+            ax.set_facecolor("#111111")
+            line_color = "white"
 
         ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.5, color=line_color, zorder=1)
         ax.set_xlabel("Data")
