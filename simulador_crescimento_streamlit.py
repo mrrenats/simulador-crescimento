@@ -16,6 +16,15 @@ DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
 
 st.title(APP_TITLE)
 
+st.markdown(
+    "<style>"
+    "div[data-testid='stIFrame']{width:100% !important;}"
+    "div[data-testid='stIFrame'] > iframe{width:100% !important;}"
+    "</style>",
+    unsafe_allow_html=True
+)
+
+
 # CSS global para largura total e destaque do total
 st.markdown(
     """
@@ -278,7 +287,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         # Tabela full-width no mesmo container
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
         with container:
-            (__import__('streamlit').html(html, height=520) if hasattr(st, 'html') else components.html(html, height=520, scrolling=True))
+            (components.html(html, height=520, scrolling=True) if hasattr(st, 'html') else components.html(html, height=520, scrolling=True))
 
         # Valor final em destaque
         valor_final = df_ops["Valor (R$)"].iloc[-1]
