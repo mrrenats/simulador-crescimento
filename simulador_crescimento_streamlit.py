@@ -8,12 +8,38 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import re
 
+# -------------------------------------------------
+# Configuração de página e estilo
+# -------------------------------------------------
+st.set_page_config(layout="wide")
+
 APP_TITLE = "Simulador de ganhos e perdas do Aviator"
 DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
 
 st.title(APP_TITLE)
 
-# ---------- Utilidades ----------
+# CSS global para largura total e destaque do total
+st.markdown(
+    """
+    <style>
+    .fullwidth-embed, .fullwidth-embed iframe, div[data-testid='stIFrame'] iframe { width: 100% !important; }
+    .total-highlight {
+        background:#eef8ff;
+        border:1px solid #cce6ff;
+        padding:14px 16px;
+        border-radius:8px;
+        margin-top:8px;
+    }
+    .total-highlight .label { font-size:1rem; color:#1b4d8a; font-weight:600; }
+    .total-highlight .value { font-size:2rem; font-weight:800; color:#0b2e59; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# -------------------------------------------------
+# Utilidades
+# -------------------------------------------------
 def parse_percent_br(pct_str: str) -> float:
     """Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85)."""
     if not isinstance(pct_str, str):
@@ -52,7 +78,7 @@ def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dia
     return ciclo
 
 def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
-    """Retorna SOMENTE os dias com operação aplicada; sem dias parados."""
+    """Retorna SOMENTE os dias com operação; sem dias parados."""
     valor = valor_inicial
     data_atual = data_inicio
     historico = []
@@ -77,40 +103,46 @@ def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
 
 def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
-    """Gera HTML da tabela com linha inicial + dias com operação; com cores por linha. Largura 100%."""
+    """HTML da tabela (linha inicial + operações) com largura 100%."""
     linhas = []
-    linhas.append("""
-    <thead>
-      <tr>
-        <th style="text-align:left;padding:6px;">Data</th>
-        <th style="text-align:left;padding:6px;">Tipo</th>
-        <th style="text-align:right;padding:6px;">Variação (%)</th>
-        <th style="text-align:right;padding:6px;">Valor (R$)</th>
-      </tr>
-    </thead>
-    """)
-    linhas.append(f"""
-    <tr style="background-color:#f0f0f0;">
-      <td style="padding:6px;">{data_inicio.strftime('%d/%m/%Y')}</td>
-      <td style="padding:6px;">Inicial</td>
-      <td style="text-align:right;padding:6px;">-</td>
-      <td style="text-align:right;padding:6px;">R$ {br_num(valor_inicial)}</td>
-    </tr>
-    """)
+    linhas.append(
+        """
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px;">Data</th>
+            <th style="text-align:left;padding:6px;">Tipo</th>
+            <th style="text-align:right;padding:6px;">Variação (%)</th>
+            <th style="text-align:right;padding:6px;">Valor (R$)</th>
+          </tr>
+        </thead>
+        """
+    )
+    linhas.append(
+        f"""
+        <tr style="background-color:#f0f0f0;">
+          <td style="padding:6px;">{data_inicio.strftime('%d/%m/%Y')}</td>
+          <td style="padding:6px;">Inicial</td>
+          <td style="text-align:right;padding:6px;">-</td>
+          <td style="text-align:right;padding:6px;">R$ {br_num(valor_inicial)}</td>
+        </tr>
+        """
+    )
     if not df_ops.empty:
         for _, r in df_ops.iterrows():
             cor = "#e6ffe6" if r["Tipo"] == "Ganho" else ("#ffe6e6" if r["Tipo"] == "Perda" else "#ffffff")
             data_br = pd.to_datetime(r["Data"]).strftime("%d/%m/%Y")
             var_br = f"{br_num(r['Variação (%)'])}%"
             val_br = f"R$ {br_num(r['Valor (R$)'])}"
-            linhas.append(f"""
-            <tr style="background-color:{cor};">
-              <td style="padding:6px;">{data_br}</td>
-              <td style="padding:6px;">{r['Tipo']}</td>
-              <td style="text-align:right;padding:6px;">{var_br}</td>
-              <td style="text-align:right;padding:6px;">{val_br}</td>
-            </tr>
-            """)
+            linhas.append(
+                f"""
+                <tr style="background-color:{cor};">
+                  <td style="padding:6px;">{data_br}</td>
+                  <td style="padding:6px;">{r['Tipo']}</td>
+                  <td style="text-align:right;padding:6px;">{var_br}</td>
+                  <td style="text-align:right;padding:6px;">{val_br}</td>
+                </tr>
+                """
+            )
     html = f"""
     <div style="overflow-x:auto;width:100%;">
       <table style="border-collapse:collapse;width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
@@ -120,7 +152,7 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
     """
     return html
 
-# ---------- Máscara automática para data fim ----------
+# Máscara automática para data de fim (dd/mm/aaaa)
 def _format_data_fim_on_change():
     txt = st.session_state.get("data_fim_txt", "")
     digits = "".join(ch for ch in txt if ch.isdigit())[:8]
@@ -131,16 +163,18 @@ def _format_data_fim_on_change():
     else:
         st.session_state["data_fim_txt"] = digits
 
-# ---------- Entradas ----------
+# -------------------------------------------------
+# Entradas
+# -------------------------------------------------
 hoje = datetime.now().strftime("%d/%m/%Y")
 
 st.subheader("Período e valor inicial")
-c1, c2, c3 = st.columns([1,1,1])
-with c1:
+col1, col2, col3 = st.columns([1,1,1])
+with col1:
     valor_inicial = st.number_input("Valor inicial (R$)", min_value=0.0, value=200.0, step=100.0)
-with c2:
+with col2:
     data_inicio_txt = st.text_input("Data de início (dd/mm/aaaa)", value=hoje)
-with c3:
+with col3:
     data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="", key="data_fim_txt", on_change=_format_data_fim_on_change)
 
 fim_txt = st.session_state.get("data_fim_txt", data_fim_txt)
@@ -160,6 +194,7 @@ except Exception as e:
     data_fim = None
 
 st.caption(f"Período selecionado: {data_inicio_txt} — {fim_txt or '(defina a data de fim)'}")
+
 
 st.subheader("Dias com operações")
 dias_ativos = []
@@ -205,7 +240,9 @@ else:
         erro = str(e)
         st.error(erro)
 
-# ---------- Execução ----------
+# -------------------------------------------------
+# Execução
+# -------------------------------------------------
 if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
     df_ops = simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
 
@@ -243,8 +280,13 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         # Tabela full-width no mesmo container
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
         with container:
-            components.html(html, height=480, scrolling=True)
+            components.html(f"<div class='fullwidth-embed'>{html}</div>", height=520, scrolling=True)
 
+        # Valor final em destaque
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        st.success(f"Valor final em {data_final}: **R$ {br_num(valor_final)}**")
+        st.markdown(
+            f"<div class='total-highlight'><span class='label'>Valor final em {data_final}:</span> "
+            f"<span class='value'>R$ {br_num(valor_final)}</span></div>",
+            unsafe_allow_html=True
+        )
