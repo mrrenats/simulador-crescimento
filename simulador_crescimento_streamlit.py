@@ -226,7 +226,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         row_colors = ['#e6ffe6' if t=='Ganho' else ('#ffe6e6' if t=='Perda' else '#ffffff') for t in df_ops['Tipo']]
         fig_tbl = go.Figure(data=[go.Table(
             header=dict(values=header_vals, fill_color='#f0f0f0', align=['left','left','right','right']),
-            cells=dict(values=cells_vals, fill_color=[row_colors]*len(header_vals), align=['left','left','right','right'])
+            cells=dict(values=cells_vals, fill_color=[row_colors]*len(header_vals), align=['left','left','right','right']), font=dict(color='black')
         )])
         fig_tbl.update_layout(margin=dict(l=0,r=0,t=0,b=0))
         with container:
