@@ -18,6 +18,15 @@ st.title(APP_TITLE)
 
 st.markdown(
     "<style>"
+    ".stMarkdown, .stMarkdown > div { width: 100% !important; }"
+    "table { table-layout: fixed; }"
+    "</style>",
+    unsafe_allow_html=True
+)
+
+
+st.markdown(
+    "<style>"
     "div[data-testid='stIFrame']{width:100% !important;}"
     "div[data-testid='stIFrame'] > iframe{width:100% !important;}"
     "</style>",
@@ -287,7 +296,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         # Tabela full-width no mesmo container
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
         with container:
-            components.html(html, height=520, scrolling=True)
+            st.markdown(html, unsafe_allow_html=True)
 
         # Valor final em destaque
         valor_final = df_ops["Valor (R$)"].iloc[-1]
