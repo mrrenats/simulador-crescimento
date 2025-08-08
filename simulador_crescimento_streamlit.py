@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import re
 
-st.title("Simulador de Juros Compostos • Ciclos Personalizados (v3c)")
+st.title("Simulador de ganhos e perdas do Aviator")
 
 # ===== Utilidades =====
 def parse_percent_br(pct_str: str) -> float:
@@ -66,38 +66,56 @@ def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
         data_atual += timedelta(days=1)
     return pd.DataFrame(historico)
 
-def formatar_df_br(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> pd.DataFrame:
-    \"\"\"Inclui linha inicial (no topo) e formata PT-BR.\"\"\"
+def formatar_br_num(v):
+    return (\"{:,.2f}\".format(v)).replace(\",\", \"X\").replace(\".\", \",\").replace(\"X\", \".\")
+
+def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
+    \"\"\"Gera HTML da tabela com linha inicial + dias com operação; com cores por linha.\"\"\"
     linhas = []
-    linhas.append({
-        \"Data\": data_inicio,
-        \"Tipo\": \"Inicial\",
-        \"Variação (%)\": \"—\",
-        \"Valor (R$)\": valor_inicial
-    })
+    # Cabeçalho
+    linhas.append(\"\"\"
+    <thead>
+      <tr>
+        <th style=\"text-align:left;padding:6px;\">Data</th>
+        <th style=\"text-align:left;padding:6px;\">Tipo</th>
+        <th style=\"text-align:right;padding:6px;\">Variação (%)</th>
+        <th style=\"text-align:right;padding:6px;\">Valor (R$)</th>
+      </tr>
+    </thead>
+    \"\"\")
+    # Linha inicial (cinza)
+    linhas.append(f\"\"\"\
+    <tr style=\"background-color:#f0f0f0;\">
+      <td style=\"padding:6px;\">{data_inicio.strftime('%d/%m/%Y')}</td>
+      <td style=\"padding:6px;\">Inicial</td>
+      <td style=\"text-align:right;padding:6px;\">-</td>
+      <td style=\"text-align:right;padding:6px;\">R$ {formatar_br_num(valor_inicial)}</td>
+    </tr>
+    \"\"\")
+    # Operações
     if not df_ops.empty:
         for _, r in df_ops.iterrows():
-            linhas.append({
-                \"Data\": r[\"Data\"],
-                \"Tipo\": r[\"Tipo\"],
-                \"Variação (%)\": r[\"Variação (%)\"],
-                \"Valor (R$)\": r[\"Valor (R$)\"]
-            })
-    out = pd.DataFrame(linhas)
-    out[\"Data\"] = pd.to_datetime(out[\"Data\"]).dt.strftime(\"%d/%m/%Y\")
-    out[\"Variação (%)\"] = out[\"Variação (%)\"].apply(lambda v: \"—\" if v == \"—\" else f\"{v:,.2f}%\".replace(\",\",\"X\").replace(\".\",\",\").replace(\"X\",\".\"))
-    out[\"Valor (R$)\"] = out[\"Valor (R$)\"].apply(lambda v: f\"R$ {v:,.2f}\".replace(\",\",\"X\").replace(\".\",\",\").replace(\"X\",\".\"))
-    return out
-
-def colorir_linhas(row):
-    t = row.get(\"Tipo\")
-    if t == \"Ganho\":
-        return [\"background-color: #e6ffe6\"] * len(row)
-    if t == \"Perda\":
-        return [\"background-color: #ffe6e6\"] * len(row)
-    if t == \"Inicial\":
-        return [\"background-color: #f0f0f0\"] * len(row)
-    return [\"\"] * len(row)
+            cor = \"#e6ffe6\" if r[\"Tipo\"] == \"Ganho\" else (\"#ffe6e6\" if r[\"Tipo\"] == \"Perda\" else \"#ffffff\")
+            data_br = pd.to_datetime(r[\"Data\"]).strftime(\"%d/%m/%Y\")
+            var_br = f\"{formatar_br_num(r['Variação (%)'])}%\"
+            val_br = f\"R$ {formatar_br_num(r['Valor (R$)'])}\"
+            linhas.append(f\"\"\"\
+            <tr style=\"background-color:{cor};\">
+              <td style=\"padding:6px;\">{data_br}</td>
+              <td style=\"padding:6px;\">{r['Tipo']}</td>
+              <td style=\"text-align:right;padding:6px;\">{var_br}</td>
+              <td style=\"text-align:right;padding:6px;\">{val_br}</td>
+            </tr>
+            \"\"\")
+    # Tabela completa
+    html = f\"\"\"\
+    <div style=\"overflow-x:auto;\">
+      <table style=\"border-collapse:collapse;width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;\">
+        {''.join(linhas)}
+      </table>
+    </div>
+    \"\"\"
+    return html
 
 # ===== Entradas =====
 st.subheader(\"Parâmetros do período e valor inicial\")
@@ -174,8 +192,8 @@ if st.button(\"Simular\") and not (erro or data_erro):
         df_chart = df_ops[[\"Data\", \"Valor (R$)\"]].copy().set_index(\"Data\")
         st.line_chart(df_chart)
 
-        df_tbl = formatar_df_br(df_ops, valor_inicial, data_inicio)
-        st.table(df_tbl.style.apply(colorir_linhas, axis=1))
+        html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
+        st.markdown(html, unsafe_allow_html=True)
 
         valor_final = df_ops[\"Valor (R$)\"].iloc[-1]
         data_final = df_ops[\"Data\"].iloc[-1].strftime(\"%d/%m/%Y\")
