@@ -232,10 +232,8 @@ if st.button("Simular") and not (erro or data_erro):
         with container:
             components.html(html, height=420, scrolling=True)
 
-        valor_final = df_ops["Valor (R$)"].iloc[-1]
+                valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        st.success(("Valor final em {}: R$ {}".format(
-            data_final,
-            ("{:,.2f}".format(valor_final)).replace(",", "X").replace(".", ",").replace("X", ".")
-        )))
+        valor_fmt = ("{:,.2f}".format(valor_final)).replace(",", "X").replace(".", ",").replace("X", ".")
+        st.success(f"Valor final em {data_final}: R$ {valor_fmt}")
         )))
