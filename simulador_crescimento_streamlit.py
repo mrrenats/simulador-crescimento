@@ -2,8 +2,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+from PIL import Image
 from datetime import datetime, timedelta
+from pathlib import Path
 import re
+import matplotlib.pyplot as plt
 
 st.title("Simulador de ganhos e perdas do Aviator")
 
@@ -110,7 +113,7 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
             """)
     html = f"""
     <div style="overflow-x:auto;">
-      <table style="border-collapse:collapse;width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
+      <table style="border-collapse:collapse;width:100%;max-width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
         {''.join(linhas)}
       </table>
     </div>
@@ -138,6 +141,9 @@ except Exception as e:
     data_erro = str(e)
 
 st.caption(f"Período selecionado: {data_inicio_txt} — {data_fim_txt}")
+
+# Upload de imagem para fundo do gráfico
+bg_file = st.file_uploader("Imagem de fundo do gráfico (opcional)", type=["png","jpg","jpeg","webp"])
 
 st.subheader("Dias com operações")
 dias_ativos = []
@@ -189,9 +195,29 @@ if st.button("Simular") and not (erro or data_erro):
     if df_ops.empty:
         st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
     else:
-        df_chart = df_ops[["Data", "Valor (R$)"]].copy().set_index("Data")
-        st.line_chart(df_chart)
+        # Gráfico com Matplotlib (mesmo container do resultado)
+        fig, ax = plt.subplots(figsize=(10, 4))
+        # Preparar dados
+        datas = df_ops["Data"].values
+        valores = df_ops["Valor (R$)"].values
 
+        # Imagem de fundo (se houver)
+        if bg_file is not None:
+            try:
+                img = Image.open(bg_file)
+                # Desenhar a imagem por trás do gráfico
+                ax.imshow(img, extent=[0, len(datas)-1, min(valores), max(valores)], aspect='auto', zorder=0)
+            except Exception as _e:
+                st.warning("Não foi possível usar a imagem enviada como fundo.")
+
+        # Plotar a curva por cima
+        ax.plot(range(len(datas)), valores, linewidth=2, zorder=1)
+        ax.set_xlabel("Operações")
+        ax.set_ylabel("Valor (R$)")
+        ax.grid(True)
+        st.pyplot(fig)
+
+        # Tabela ocupando 100% da largura do mesmo container
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
         components.html(html, height=420, scrolling=True)
 
