@@ -1,6 +1,5 @@
 
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -14,11 +13,10 @@ DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
 
 st.title(APP_TITLE)
 
+# ---------- CSS mínimo para destaque do total ----------
 st.markdown(
     """
     <style>
-      div[data-testid='stIFrame']{width:100% !important;}
-      div[data-testid='stIFrame'] > iframe{width:100% !important;}
       .total-highlight {
           background:#eef8ff;
           border:1px solid #cce6ff;
@@ -33,19 +31,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-def parse_percent_br(pct_str: str) -> float:
-    if not isinstance(pct_str, str):
-        raise ValueError("Percentual inválido: informe texto como '12,34%'.")
-    s = pct_str.strip().replace(" ", "")
-    if not re.fullmatch(r"-?\d{1,3},\d{2}%", s):
-        raise ValueError("Formato inválido. Use '20,00%' ou '-15,00%'.")
-    negativo = s.startswith("-")
-    s_num = s.replace("%", "").replace("-", "")
-    valor = float(s_num.replace(",", "."))
-    if negativo:
-        valor = -valor
-    return 1 + (valor / 100.0)
-
+# ---------- Utilidades ----------
 def parse_data_br(txt: str) -> datetime:
     s = (txt or "").strip()
     if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", s):
@@ -53,15 +39,13 @@ def parse_data_br(txt: str) -> datetime:
     return datetime.strptime(s, "%d/%m/%Y")
 
 def construir_ciclo(ganho_pct: float, perda_pct: float, dias_ganho: int, dias_perda: int, comeca_por: str):
-    """Monta a lista de multiplicadores do ciclo conforme parâmetros numéricos.
-    ganho_pct e perda_pct são números (ex.: 20.00, 15.00). A perda é aplicada como negativa.
-    """
+    """ganho_pct e perda_pct são percentuais 'cheios' (ex.: 20.00 -> 20,00%)"""
     if dias_ganho < 0 or dias_perda < 0:
         raise ValueError("A quantidade de dias deve ser não negativa.")
     if dias_ganho == 0 and dias_perda == 0:
         raise ValueError("Defina ao menos um dia de ganho ou de perda.")
     fator_ganho = 1 + (ganho_pct / 100.0)
-    fator_perda = 1 - (perda_pct / 100.0)
+    fator_perda = 1 - (perda_pct / 100.0)  # perda aplicada como negativa
     bloco_ganhos = [fator_ganho] * dias_ganho
     bloco_perdas = [fator_perda] * dias_perda
     if comeca_por == "Ganho":
@@ -94,17 +78,50 @@ def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
 def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
 
-# Máscara automática para data fim
+# ---------- Máscara automática para data fim (dd/mm/aaaa) ----------
 def _format_data_fim_on_change():
     txt = st.session_state.get("data_fim_txt", "")
     digits = "".join(ch for ch in txt if ch.isdigit())[:8]
-    if len(digits) >= 5:
-        st.session_state["data_fim_txt"] = f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
-    elif len(digits) >= 3:
+    if len(digits) == 0:
+        st.session_state["data_fim_txt"] = ""
+    elif len(digits) <= 2:
+        st.session_state["data_fim_txt"] = digits
+    elif len(digits) <= 4:
         st.session_state["data_fim_txt"] = f"{digits[:2]}/{digits[2:4]}"
     else:
-        st.session_state["data_fim_txt"] = digits
+        st.session_state["data_fim_txt"] = f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
 
+# ---------- Máscara para percentuais com vírgula (interpretação 'cheia') ----------
+def _format_pct_on_change_ganho():
+    txt = st.session_state.get("ganho_pct_txt", "")
+    digits = "".join(ch for ch in txt if ch.isdigit())[:6]
+    if not digits:
+        st.session_state["ganho_pct_txt"] = ""
+        return
+    val = int(digits)
+    st.session_state["ganho_pct_txt"] = f"{val},00"
+
+def _format_pct_on_change_perda():
+    txt = st.session_state.get("perda_pct_txt", "")
+    digits = "".join(ch for ch in txt if ch.isdigit())[:6]
+    if not digits:
+        st.session_state["perda_pct_txt"] = ""
+        return
+    val = int(digits)
+    st.session_state["perda_pct_txt"] = f"{val},00"
+
+def _pct_str_br_to_float(pct_txt: str) -> float:
+    s = (pct_txt or "").strip()
+    if not s:
+        raise ValueError("Preencha os percentuais de ganho e perda.")
+    s_num = s.replace(".", "").replace(",", ".")
+    try:
+        val = float(s_num)
+    except Exception:
+        raise ValueError("Percentual inválido. Digite apenas números; a vírgula entra automaticamente (ex.: 20 → 20,00).")
+    return round(val, 2)
+
+# ---------- Entradas ----------
 hoje = datetime.now().strftime("%d/%m/%Y")
 
 st.subheader("Período e valor inicial")
@@ -164,7 +181,7 @@ with cc3:
 dias_ganho = st.number_input("Qtd. dias de ganho no ciclo", min_value=0, value=2, step=1)
 dias_perda = st.number_input("Qtd. dias de perda no ciclo", min_value=0, value=1, step=1)
 
-st.caption("Ex.: Para 2 ganhos e 1 perda, informe ganho=2 e perda=1. Digite apenas números; a vírgula com duas casas é inserida automaticamente (ex.: 2000 → 20,00).")
+st.caption("Ex.: Para 2 ganhos e 1 perda, informe ganho=2 e perda=1. Digite apenas números; a vírgula com duas casas é automática (ex.: 15 → 15,00).")
 
 erro = None
 ciclo = []
@@ -174,14 +191,13 @@ else:
     try:
         ganho_pct = _pct_str_br_to_float(st.session_state.get('ganho_pct_txt', ganho_pct_txt))
         perda_pct = _pct_str_br_to_float(st.session_state.get('perda_pct_txt', perda_pct_txt))
-        ganho_pct = _pct_str_br_to_float(st.session_state.get('ganho_pct_txt', ganho_pct_txt))
-        perda_pct = _pct_str_br_to_float(st.session_state.get('perda_pct_txt', perda_pct_txt))
         ciclo = construir_ciclo(ganho_pct, perda_pct, dias_ganho, dias_perda, comeca_por)
         st.write("Ciclo multiplicativo:", ciclo)
     except Exception as e:
         erro = str(e)
         st.error(erro)
 
+# ---------- Execução ----------
 if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
     df_ops = simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
 
@@ -190,7 +206,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
     else:
         container = st.container()
 
-        # Gráfico
+        # ----- Gráfico com fundo -----
         fig, ax = plt.subplots(figsize=(10, 4))
 
         bg_img = None
@@ -216,7 +232,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         with container:
             st.pyplot(fig, use_container_width=True)
 
-        # Tabela Plotly
+        # ----- Tabela Plotly (texto preto, largura total) -----
         df_tbl = df_ops.copy()
         df_tbl["Data"] = pd.to_datetime(df_tbl["Data"]).dt.strftime("%d/%m/%Y")
         df_tbl["Variação (%)"] = df_tbl["Variação (%)"].map(lambda v: f"{br_num(v)}%")
@@ -232,6 +248,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         with container:
             st.plotly_chart(fig_tbl, use_container_width=True)
 
+        # ----- Valor final em destaque -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
         st.markdown(
