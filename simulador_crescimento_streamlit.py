@@ -187,10 +187,6 @@ with cc2:
     perda_pct_txt = st.text_input("Percentual de perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)
 with cc3:
     comeca_por = st.radio("Ciclo começa por:", options=["Ganho", "Perda"], index=0, horizontal=True)
-
-dias_ganho = st.number_input("Qtd. dias de ganho no ciclo", min_value=0, value=2, step=1)
-dias_perda = st.number_input("Qtd. dias de perda no ciclo", min_value=0, value=1, step=1)
-
 st.caption("Ex.: Para 2 ganhos e 1 perda, informe ganho=2 e perda=1. Digite apenas números; a vírgula com duas casas é automática (ex.: 15 → 15,00).")
 
 erro = None
