@@ -6,6 +6,7 @@ from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
 import re
+DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
 import matplotlib.pyplot as plt
 
 st.title("Simulador de ganhos e perdas do Aviator")
@@ -112,7 +113,7 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
             </tr>
             """)
     html = f"""
-    <div style="overflow-x:auto;">
+    <div style="overflow-x:auto;width:100%;max-width:100%;">
       <table style="border-collapse:collapse;width:100%;max-width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
         {''.join(linhas)}
       </table>
@@ -143,7 +144,6 @@ except Exception as e:
 st.caption(f"Período selecionado: {data_inicio_txt} — {data_fim_txt}")
 
 # Upload de imagem para fundo do gráfico
-bg_file = st.file_uploader("Imagem de fundo do gráfico (opcional)", type=["png","jpg","jpeg","webp"])
 
 st.subheader("Dias com operações")
 dias_ativos = []
