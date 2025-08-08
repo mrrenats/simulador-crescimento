@@ -155,9 +155,9 @@ with d7:
 st.subheader("Ciclo de ganhos e perdas")
 cc1, cc2, cc3 = st.columns([1,1,1])
 with cc1:
-    ganho_pct_txt = st.text_input("Percentual de ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)", value="20,00%")
+    ganho_pct_txt = st.text_input("Percentual de ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)
 with cc2:
-    perda_pct_txt = st.text_input("Percentual de perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)", value="-15,00%")
+    perda_pct_txt = st.text_input("Percentual de perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)
 with cc3:
     comeca_por = st.radio("Ciclo começa por:", options=["Ganho", "Perda"], index=0, horizontal=True)
 
@@ -172,6 +172,8 @@ if data_erro:
     st.error(data_erro)
 else:
     try:
+        ganho_pct = _pct_str_br_to_float(st.session_state.get('ganho_pct_txt', ganho_pct_txt))
+        perda_pct = _pct_str_br_to_float(st.session_state.get('perda_pct_txt', perda_pct_txt))
         ganho_pct = _pct_str_br_to_float(st.session_state.get('ganho_pct_txt', ganho_pct_txt))
         perda_pct = _pct_str_br_to_float(st.session_state.get('perda_pct_txt', perda_pct_txt))
         ciclo = construir_ciclo(ganho_pct, perda_pct, dias_ganho, dias_perda, comeca_por)
