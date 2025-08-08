@@ -8,15 +8,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import re
 
-# ---------------- Constantes ----------------
 APP_TITLE = "Simulador de ganhos e perdas do Aviator"
 DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
 
 st.title(APP_TITLE)
 
-# ---------------- Utilidades ----------------
+# ---------- Utilidades ----------
 def parse_percent_br(pct_str: str) -> float:
-    """Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85)."""
     if not isinstance(pct_str, str):
         raise ValueError("Percentual inválido: informe texto como '12,34%'.")
     s = pct_str.strip().replace(" ", "")
@@ -30,14 +28,12 @@ def parse_percent_br(pct_str: str) -> float:
     return 1 + (valor / 100.0)
 
 def parse_data_br(txt: str) -> datetime:
-    """Recebe 'dd/mm/aaaa' e retorna datetime; lança ValueError se inválida."""
     s = (txt or "").strip()
-    if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", s):
+    if not re.fullmatch(r"\\d{2}/\\d{2}/\\d{4}", s):
         raise ValueError("Use o formato dd/mm/aaaa, ex.: 07/08/2025.")
     return datetime.strptime(s, "%d/%m/%Y")
 
 def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dias_perda: int, comeca_por: str):
-    """Monta a lista de multiplicadores do ciclo conforme parâmetros."""
     fator_ganho = parse_percent_br(ganho_pct_str)
     fator_perda = parse_percent_br(perda_pct_str)
     if dias_ganho < 0 or dias_perda < 0:
@@ -53,7 +49,6 @@ def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dia
     return ciclo
 
 def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
-    """Retorna SOMENTE os dias com operação aplicada; sem dias parados."""
     valor = valor_inicial
     data_atual = data_inicio
     historico = []
@@ -74,14 +69,13 @@ def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
         data_atual += timedelta(days=1)
     return pd.DataFrame(historico)
 
-def formatar_br_num(v: float) -> str:
+def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
 
 def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
-    """Gera HTML da tabela com linha inicial + dias com operação; com cores por linha."""
     linhas = []
-    # Cabeçalho
-    linhas.append("""    <thead>
+    linhas.append(\"\"\"\
+    <thead>
       <tr>
         <th style="text-align:left;padding:6px;">Data</th>
         <th style="text-align:left;padding:6px;">Tipo</th>
@@ -89,75 +83,84 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
         <th style="text-align:right;padding:6px;">Valor (R$)</th>
       </tr>
     </thead>
-    """)
-    # Linha inicial (cinza)
-    linhas.append(f"""    <tr style="background-color:#f0f0f0;">
+    \"\"\"\
+    )
+    linhas.append(f\"\"\"\
+    <tr style="background-color:#f0f0f0;">
       <td style="padding:6px;">{data_inicio.strftime('%d/%m/%Y')}</td>
       <td style="padding:6px;">Inicial</td>
       <td style="text-align:right;padding:6px;">-</td>
-      <td style="text-align:right;padding:6px;">R$ {formatar_br_num(valor_inicial)}</td>
+      <td style="text-align:right;padding:6px;">R$ {br_num(valor_inicial)}</td>
     </tr>
-    """)
-    # Operações
+    \"\"\")
     if not df_ops.empty:
         for _, r in df_ops.iterrows():
             cor = "#e6ffe6" if r["Tipo"] == "Ganho" else ("#ffe6e6" if r["Tipo"] == "Perda" else "#ffffff")
             data_br = pd.to_datetime(r["Data"]).strftime("%d/%m/%Y")
-            var_br = f"{formatar_br_num(r['Variação (%)'])}%"
-            val_br = f"R$ {formatar_br_num(r['Valor (R$)'])}"
-            linhas.append(f"""            <tr style="background-color:{cor};">
+            var_br = f"{br_num(r['Variação (%)'])}%"
+            val_br = f"R$ {br_num(r['Valor (R$)'])}"
+            linhas.append(f\"\"\"\
+            <tr style="background-color:{cor};">
               <td style="padding:6px;">{data_br}</td>
               <td style="padding:6px;">{r['Tipo']}</td>
               <td style="text-align:right;padding:6px;">{var_br}</td>
               <td style="text-align:right;padding:6px;">{val_br}</td>
             </tr>
-            """)
-    html = f"""    <div style="overflow-x:auto;width:100%;max-width:100%;">
+            \"\"\")
+    html = f\"\"\"\
+    <div style="overflow-x:auto;width:100%;max-width:100%;">
       <table style="border-collapse:collapse;width:100%;max-width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
         {''.join(linhas)}
       </table>
     </div>
-    """
+    \"\"\"
     return html
 
-# ---------------- Entradas ----------------
-st.subheader("Parâmetros do período e valor inicial")
-c_top1, c_top2, c_top3 = st.columns([1,1,1])
-with c_top1:
-    valor_inicial = st.number_input("Valor inicial (R$)", min_value=0.0, value=200.0, step=100.0)
-with c_top2:
-    data_inicio_txt = st.text_input("Data de início (dd/mm/aaaa)", value="07/08/2025")
-with c_top3:
-    data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="31/12/2025")
+# ---------- Entradas ----------
+# Data atual BR como default de início; fim em branco
+hoje = datetime.now().strftime("%d/%m/%Y")
 
-# Validar datas BR
+st.subheader("Período e valor inicial")
+c1, c2, c3 = st.columns([1,1,1])
+with c1:
+    valor_inicial = st.number_input("Valor inicial (R$)", min_value=0.0, value=200.0, step=100.0)
+with c2:
+    data_inicio_txt = st.text_input("Data de início (dd/mm/aaaa)", value=hoje)
+with c3:
+    data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="")
+
 data_erro = None
 try:
     data_inicio = parse_data_br(data_inicio_txt)
-    data_fim = parse_data_br(data_fim_txt)
-    if data_inicio > data_fim:
-        data_erro = "A data de início deve ser anterior ou igual à data de fim."
+    if not data_fim_txt.strip():
+        data_erro = "Informe a data de fim no formato dd/mm/aaaa."
+        data_fim = None
+    else:
+        data_fim = parse_data_br(data_fim_txt)
+        if data_inicio > data_fim:
+            data_erro = "A data de início deve ser anterior ou igual à data de fim."
 except Exception as e:
     data_erro = str(e)
+    data_fim = None
 
-st.caption(f"Período selecionado: {data_inicio_txt} — {data_fim_txt}")
+st.caption(f"Período selecionado: {data_inicio_txt} — {data_fim_txt or '(defina a data de fim)'}")
 
 st.subheader("Dias com operações")
 dias_ativos = []
-c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-with c1:
+d1, d2, d3, d4, d5, d6, d7 = st.columns(7)
+with d1:
     if st.checkbox("Seg", value=True): dias_ativos.append(0)
-with c2:
+with d2:
     if st.checkbox("Ter", value=True): dias_ativos.append(1)
-with c3:
+with d3:
     if st.checkbox("Qua", value=False): dias_ativos.append(2)
-with c4:
+with d4:
     if st.checkbox("Qui", value=True): dias_ativos.append(3)
-with c5:
+with d5:
     if st.checkbox("Sex", value=False): dias_ativos.append(4)
-with c6:
+with d6:
     if st.checkbox("Sáb", value=False): dias_ativos.append(5)
-with c7:
+with d7:
     if st.checkbox("Dom", value=False): dias_ativos.append(6)
 
 st.subheader("Ciclo de ganhos e perdas")
@@ -186,8 +189,8 @@ else:
         erro = str(e)
         st.error(erro)
 
-# ---------------- Execução ----------------
-if st.button("Simular") and not (erro or data_erro):
+# ---------- Execução ----------
+if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
     df_ops = simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
 
     if df_ops.empty:
@@ -195,7 +198,7 @@ if st.button("Simular") and not (erro or data_erro):
     else:
         container = st.container()
 
-        # ----- Gráfico com fundo fixo -----
+        # Gráfico com fundo DEFAULT_BG (se existir) e linha contrastante
         fig, ax = plt.subplots(figsize=(10, 4))
 
         bg_img = None
@@ -207,9 +210,12 @@ if st.button("Simular") and not (erro or data_erro):
 
         if bg_img is not None:
             ax.imshow(bg_img, extent=(0, 1, 0, 1), transform=ax.transAxes, zorder=0)
+            line_color = "white"
+        else:
+            ax.set_facecolor("#111111")  # fundo escuro para dar contraste
+            line_color = "black"         # linha preta p/ contraste no fundo escuro
 
-        # Linha branca para contraste com o fundo
-        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.5, color="white", zorder=1)
+        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.5, color=line_color, zorder=1)
         ax.set_xlabel("Data")
         ax.set_ylabel("Valor (R$)")
         ax.grid(True, alpha=0.3)
@@ -218,13 +224,11 @@ if st.button("Simular") and not (erro or data_erro):
         with container:
             st.pyplot(fig, use_container_width=True)
 
-        # ----- Tabela HTML largura 100% -----
+        # Tabela full-width no mesmo container
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
         with container:
-            components.html(html, height=420, scrolling=True)
+            components.html(html, height=480, scrolling=True)
 
-        # Resumo
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        valor_fmt = formatar_br_num(valor_final)
-        st.success(f"Valor final em {data_final}: R$ {valor_fmt}")
+        st.success(f"Valor final em {data_final}: R$ {br_num(valor_final)}")
