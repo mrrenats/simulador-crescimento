@@ -170,6 +170,16 @@ with d7:
     if st.checkbox("Dom", value=False): dias_ativos.append(6)
 
 st.subheader("Ciclo de ganhos e perdas")
+dd1, dd2 = st.columns([1,1])
+with dd1:
+    dias_ganho = st.selectbox("Qtd. dias de ganho no ciclo", options=list(range(0, 11)), index=2)
+with dd2:
+    dias_perda = st.selectbox("Qtd. dias de perda no ciclo", options=list(range(0, 11)), index=1)
+if dias_ganho == 0 and dias_perda == 0:
+    st.error('O ciclo não pode ter 0 dias de ganho e 0 dias de perda ao mesmo tempo.')
+    st.stop()
+
+
 cc1, cc2, cc3 = st.columns([1,1,1])
 with cc1:
     ganho_pct_txt = st.text_input("Percentual de ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)
