@@ -195,35 +195,47 @@ if st.button("Simular") and not (erro or data_erro):
     if df_ops.empty:
         st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
     else:
-        # Gráfico com Matplotlib (mesmo container do resultado)
+        container = st.container()
+        # --- Gráfico com fundo DEFAULT_BG ---
         fig, ax = plt.subplots(figsize=(10, 4))
-        # Preparar dados
-        datas = df_ops["Data"].values
-        valores = df_ops["Valor (R$)"].values
+        bg_img = None
+        try:
+            if Path(DEFAULT_BG).exists():
+                bg_img = Image.open(DEFAULT_BG)
+        except Exception:
+            bg_img = None
 
-        # Imagem de fundo (se houver)
-        if bg_file is not None:
+        if bg_img is not None:
+            # Colocar a imagem como fundo: usar imshow com extent baseado no eixo atual depois do plot
+            pass
+
+        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.5, color="white")
+        if bg_img is not None:
+            # redesenhar com imagem no fundo utilizando axis background via figimage
             try:
-                img = Image.open(bg_file)
-                # Desenhar a imagem por trás do gráfico
-                ax.imshow(img, extent=[0, len(datas)-1, min(valores), max(valores)], aspect='auto', zorder=0)
-            except Exception as _e:
-                st.warning("Não foi possível usar a imagem enviada como fundo.")
-
-        # Plotar a curva por cima
-        ax.plot(range(len(datas)), valores, linewidth=2, zorder=1)
-        ax.set_xlabel("Operações")
+                ax.imshow(bg_img, extent=[df_ops["Data"].min().to_pydatetime(), df_ops["Data"].max().to_pydatetime(),
+                                         df_ops["Valor (R$)"].min()*0.98, df_ops["Valor (R$)"].max()*1.02],
+                          aspect="auto", zorder=0)
+                # Trazer a linha para frente
+                ax.lines[-1].set_zorder(1)
+            except Exception:
+                pass
+        ax.set_xlabel("Data")
         ax.set_ylabel("Valor (R$)")
-        ax.grid(True)
-        st.pyplot(fig)
+        ax.grid(True, alpha=0.3)
+        fig.autofmt_xdate()
+        with container:
+            st.pyplot(fig, use_container_width=True)
 
-        # Tabela ocupando 100% da largura do mesmo container
+        # --- Tabela ---
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
-        components.html(html, height=420, scrolling=True)
+        with container:
+            components.html(html, height=420, scrolling=True)
 
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
         st.success(("Valor final em {}: R$ {}".format(
             data_final,
             ("{:,.2f}".format(valor_final)).replace(",", "X").replace(".", ",").replace("X", ".")
+        )))
         )))
