@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -94,50 +95,6 @@ def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
 
 def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
-
-def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
-    """HTML da tabela (linha inicial + operações) com largura 100%."""
-    linhas = []
-    linhas.append("""
-    <thead>
-      <tr>
-        <th style="text-align:left;padding:6px;">Data</th>
-        <th style="text-align:left;padding:6px;">Tipo</th>
-        <th style="text-align:right;padding:6px;">Variação (%)</th>
-        <th style="text-align:right;padding:6px;">Valor (R$)</th>
-      </tr>
-    </thead>
-    """)
-    linhas.append(f"""
-    <tr style="background-color:#f0f0f0;">
-      <td style="padding:6px;">{data_inicio.strftime('%d/%m/%Y')}</td>
-      <td style="padding:6px;">Inicial</td>
-      <td style="text-align:right;padding:6px;">-</td>
-      <td style="text-align:right;padding:6px;">R$ {br_num(valor_inicial)}</td>
-    </tr>
-    """)
-    if not df_ops.empty:
-        for _, r in df_ops.iterrows():
-            cor = "#e6ffe6" if r["Tipo"] == "Ganho" else ("#ffe6e6" if r["Tipo"] == "Perda" else "#ffffff")
-            data_br = pd.to_datetime(r["Data"]).strftime("%d/%m/%Y")
-            var_br = f"{br_num(r['Variação (%)'])}%"
-            val_br = f"R$ {br_num(r['Valor (R$)'])}"
-            linhas.append(f"""
-            <tr style="background-color:{cor};">
-              <td style="padding:6px;">{data_br}</td>
-              <td style="padding:6px;">{r['Tipo']}</td>
-              <td style="text-align:right;padding:6px;">{var_br}</td>
-              <td style="text-align:right;padding:6px;">{val_br}</td>
-            </tr>
-            """)
-    html = f"""
-    <div style="overflow-x:auto;width:100%;">
-      <table style="border-collapse:collapse;width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
-        {''.join(linhas)}
-      </table>
-    </div>
-    """
-    return html
 
 # ---------- Máscara automática para data fim ----------
 def _format_data_fim_on_change():
@@ -259,10 +216,21 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         with container:
             st.pyplot(fig, use_container_width=True)
 
-        # Tabela full-width no mesmo container (somente chamada direta; nada de prints de retorno)
-        html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
+        # Tabela full-width no mesmo container (somente chamada direta; nada de prints de retorno)        # Tabela (Plotly) com largura total
+        df_tbl = df_ops.copy()
+        df_tbl['Data'] = pd.to_datetime(df_tbl['Data']).dt.strftime('%d/%m/%Y')
+        df_tbl['Variação (%)'] = df_tbl['Variação (%)'].map(lambda v: f"{br_num(v)}%")
+        df_tbl['Valor (R$)'] = df_tbl['Valor (R$)'].map(lambda v: f"R$ {br_num(v)}")
+        header_vals = list(df_tbl.columns)
+        cells_vals = [df_tbl[c].tolist() for c in header_vals]
+        row_colors = ['#e6ffe6' if t=='Ganho' else ('#ffe6e6' if t=='Perda' else '#ffffff') for t in df_ops['Tipo']]
+        fig_tbl = go.Figure(data=[go.Table(
+            header=dict(values=header_vals, fill_color='#f0f0f0', align=['left','left','right','right']),
+            cells=dict(values=cells_vals, fill_color=[row_colors]*len(header_vals), align=['left','left','right','right'])
+        )])
+        fig_tbl.update_layout(margin=dict(l=0,r=0,t=0,b=0))
         with container:
-            components.html(html, height=520, scrolling=True)
+            st.plotly_chart(fig_tbl, use_container_width=True)
 
         # Valor final em destaque
         valor_final = df_ops["Valor (R$)"].iloc[-1]
