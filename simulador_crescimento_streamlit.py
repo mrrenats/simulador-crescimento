@@ -1,5 +1,6 @@
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 from datetime import datetime, timedelta
 import re
@@ -192,7 +193,7 @@ if st.button("Simular") and not (erro or data_erro):
         st.line_chart(df_chart)
 
         html = montar_tabela_html(df_ops, valor_inicial, data_inicio)
-        st.markdown(html, unsafe_allow_html=True)
+        components.html(html, height=420, scrolling=True)
 
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
