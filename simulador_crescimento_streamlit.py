@@ -1,3 +1,4 @@
+
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -76,7 +77,7 @@ def br_num(v: float) -> str:
     return ("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X", ".")
 
 def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: datetime) -> str:
-    """Gera HTML da tabela com linha inicial + dias com operação; com cores por linha."""
+    """Gera HTML da tabela com linha inicial + dias com operação; com cores por linha. Largura 100%."""
     linhas = []
     linhas.append("""
     <thead>
@@ -111,16 +112,26 @@ def montar_tabela_html(df_ops: pd.DataFrame, valor_inicial: float, data_inicio: 
             </tr>
             """)
     html = f"""
-    <div style="overflow-x:auto;width:100%;max-width:100%;">
-      <table style="border-collapse:collapse;width:100%;max-width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
+    <div style="overflow-x:auto;width:100%;">
+      <table style="border-collapse:collapse;width:100%;font-family:system-ui,Arial,sans-serif;font-size:14px;">
         {''.join(linhas)}
       </table>
     </div>
     """
     return html
 
+# ---------- Máscara automática para data fim ----------
+def _format_data_fim_on_change():
+    txt = st.session_state.get("data_fim_txt", "")
+    digits = "".join(ch for ch in txt if ch.isdigit())[:8]
+    if len(digits) >= 5:
+        st.session_state["data_fim_txt"] = f"{digits[:2]}/{digits[2:4]}/{digits[4:]}"
+    elif len(digits) >= 3:
+        st.session_state["data_fim_txt"] = f"{digits[:2]}/{digits[2:4]}"
+    else:
+        st.session_state["data_fim_txt"] = digits
+
 # ---------- Entradas ----------
-# Data de início = hoje (BR); data de fim vazia
 hoje = datetime.now().strftime("%d/%m/%Y")
 
 st.subheader("Período e valor inicial")
@@ -130,23 +141,25 @@ with c1:
 with c2:
     data_inicio_txt = st.text_input("Data de início (dd/mm/aaaa)", value=hoje)
 with c3:
-    data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="")
+    data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="", key="data_fim_txt", on_change=_format_data_fim_on_change)
+
+fim_txt = st.session_state.get("data_fim_txt", data_fim_txt)
 
 data_erro = None
 try:
     data_inicio = parse_data_br(data_inicio_txt)
-    if not data_fim_txt.strip():
+    if not fim_txt.strip():
         data_erro = "Informe a data de fim no formato dd/mm/aaaa."
         data_fim = None
     else:
-        data_fim = parse_data_br(data_fim_txt)
+        data_fim = parse_data_br(fim_txt)
         if data_inicio > data_fim:
             data_erro = "A data de início deve ser anterior ou igual à data de fim."
 except Exception as e:
     data_erro = str(e)
     data_fim = None
 
-st.caption(f"Período selecionado: {data_inicio_txt} — {data_fim_txt or '(defina a data de fim)'}")
+st.caption(f"Período selecionado: {data_inicio_txt} — {fim_txt or '(defina a data de fim)'}")
 
 st.subheader("Dias com operações")
 dias_ativos = []
@@ -234,4 +247,4 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
 
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        st.success(f"Valor final em {data_final}: R$ {br_num(valor_final)}")
+        st.success(f"Valor final em {data_final}: **R$ {br_num(valor_final)}**")
