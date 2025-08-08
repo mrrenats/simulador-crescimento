@@ -4,11 +4,11 @@ import pandas as pd
 from datetime import datetime, timedelta
 import re
 
-st.title("Simulador de Juros Compostos • Ciclos Personalizados (v3)")
+st.title("Simulador de Juros Compostos • Ciclos Personalizados (v3-fix)")
 
 # ===== Utilidades =====
 def parse_percent_br(pct_str: str) -> float:
-    \"\\"Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85).\\"\\"
+    """Converte '20,00%' ou '-15,00%' para fator multiplicativo (1.2 ou 0.85)."""
     if not isinstance(pct_str, str):
         raise ValueError("Percentual inválido: informe texto como '12,34%'.")
     s = pct_str.strip().replace(" ", "")
@@ -23,7 +23,7 @@ def parse_percent_br(pct_str: str) -> float:
     return fator
 
 def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dias_perda: int, comeca_por: str):
-    \"\\"Monta a lista de multiplicadores do ciclo conforme parâmetros.\\"\\"
+    """Monta a lista de multiplicadores do ciclo conforme parâmetros."""
     fator_ganho = parse_percent_br(ganho_pct_str)
     fator_perda = parse_percent_br(perda_pct_str)
 
@@ -42,7 +42,7 @@ def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dia
     return ciclo
 
 def simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
-    # Retorna apenas os dias com operação aplicada
+    """Retorna apenas os dias com operação aplicada."""
     valor = valor_inicial
     data_atual = data_inicio
     historico = []
@@ -51,7 +51,6 @@ def simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
     while data_atual <= data_fim:
         if data_atual.weekday() in dias_ativos and len(ciclo) > 0:
             fator = ciclo[ciclo_index]
-            valor_ant = valor
             valor = valor * fator
             ciclo_index = (ciclo_index + 1) % len(ciclo)
 
@@ -59,7 +58,7 @@ def simular(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
             tipo = "Ganho" if variacao_pct > 0 else ("Perda" if variacao_pct < 0 else "Neutro")
 
             historico.append({
-                "Data": data_atual,  # manter datetime para gráfico; formatar para tabela depois
+                "Data": data_atual,  # manter datetime p/ gráfico; formatar na tabela
                 "Tipo": tipo,
                 "Variação (%)": variacao_pct,
                 "Valor (R$)": valor
@@ -73,15 +72,12 @@ def formatar_df_br(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     out = df.copy()
-    # Formatar data no padrão brasileiro para a tabela
     out["Data"] = out["Data"].dt.strftime("%d/%m/%Y")
-    # Formatar variação e valor em PT-BR
     out["Variação (%)"] = out["Variação (%)"].map(lambda v: f"{v:,.2f}%".replace(",", "X").replace(".", ",").replace("X", "."))
     out["Valor (R$)"] = out["Valor (R$)"].map(lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
     return out
 
 def colorir_linhas(row):
-    # Recebe linha com colunas formatadas; usa 'Tipo'
     if row.get("Tipo") == "Ganho":
         return ["background-color: #e6ffe6"] * len(row)  # verde claro
     if row.get("Tipo") == "Perda":
@@ -143,16 +139,17 @@ if st.button("Simular") and not erro:
     if df_ops.empty:
         st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
     else:
-        # Gráfico: usar apenas dias com operação
+        # Gráfico (linha) com apenas dias de operação
         df_chart = df_ops[["Data", "Valor (R$)"]].copy().set_index("Data")
         st.line_chart(df_chart)
 
-        # Tabela formatada em PT-BR e colorida por linha
+        # Tabela formatada e colorida
         df_br = formatar_df_br(df_ops)
-        styler = df_br.style.apply(colorir_linhas, axis=1)
-        st.dataframe(styler, use_container_width=True)
+        st.table(df_br.style.apply(colorir_linhas, axis=1))
 
-        # Resumo final
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        st.success(f"Valor final em {data_final}: R$ {valor_final:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.success(("Valor final em {}: R$ {}".format(
+            data_final,
+            ("{:,.2f}".format(valor_final)).replace(",", "X").replace(".", ",").replace("X", ".")
+        )))
