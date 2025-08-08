@@ -248,11 +248,36 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         with container:
             st.plotly_chart(fig_tbl, use_container_width=True)
 
-        # ----- Valor final em destaque -----
+        # ----- Valor final em destaque -----        # ----- Resumo final em tabela (valor final, lucro/prejuízo e retorno %) -----        # ----- Resumo final em tabela (valor final, lucro/prejuízo, retorno %, nº operações, retorno médio/operação) -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
+        lucro = valor_final - valor_inicial
+        retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
+        num_ops = int(len(df_ops))
+        retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        st.markdown(
-            f"<div class='total-highlight'><span class='label'>Valor final em {data_final}:</span> "
-            f"<span class='value'>R$ {br_num(valor_final)}</span></div>",
-            unsafe_allow_html=True
-        )
+        # Monta tabela 5 linhas x 2 colunas
+        summary_labels = [
+            "Valor final",
+            "Lucro/Prejuízo",
+            "Retorno (%)",
+            "Nº de operações",
+            "Retorno médio/operação"
+        ]
+        summary_vals = [
+            f"R$ {br_num(valor_final)}",
+            f"R$ {br_num(lucro)}",
+            f"{br_num(retorno_pct)}%",
+            f"{num_ops}",
+            f"{br_num(retorno_medio_op)}%"
+        ]
+        lucro_color = '#1a7f37' if lucro >= 0 else '#b91c1c'
+        retorno_color = '#1a7f37' if retorno_pct >= 0 else '#b91c1c'
+        retorno_medio_color = '#1a7f37' if retorno_medio_op >= 0 else '#b91c1c'
+        font_colors = [["black"]*5, ["black", lucro_color, retorno_color, "black", retorno_medio_color]]
+        fig_sum = go.Figure(data=[go.Table(
+            header=dict(values=[f"Resumo até {data_final}", ""], fill_color='#f0f0f0', align=['left','right'], font=dict(color='black')),
+            cells=dict(values=[summary_labels, summary_vals], align=['left','right'], fill_color=[["white"]*5, ["white"]*5], font=dict(color=font_colors))
+        )])
+        fig_sum.update_layout(margin=dict(l=0,r=0,t=0,b=0))
+        with container:
+            st.plotly_chart(fig_sum, use_container_width=True)
