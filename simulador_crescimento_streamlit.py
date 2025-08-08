@@ -52,13 +52,16 @@ def parse_data_br(txt: str) -> datetime:
         raise ValueError("Use o formato dd/mm/aaaa, ex.: 07/08/2025.")
     return datetime.strptime(s, "%d/%m/%Y")
 
-def construir_ciclo(ganho_pct_str: str, perda_pct_str: str, dias_ganho: int, dias_perda: int, comeca_por: str):
-    fator_ganho = parse_percent_br(ganho_pct_str)
-    fator_perda = parse_percent_br(perda_pct_str)
+def construir_ciclo(ganho_pct: float, perda_pct: float, dias_ganho: int, dias_perda: int, comeca_por: str):
+    """Monta a lista de multiplicadores do ciclo conforme parâmetros numéricos.
+    ganho_pct e perda_pct são números (ex.: 20.00, 15.00). A perda é aplicada como negativa.
+    """
     if dias_ganho < 0 or dias_perda < 0:
         raise ValueError("A quantidade de dias deve ser não negativa.")
     if dias_ganho == 0 and dias_perda == 0:
         raise ValueError("Defina ao menos um dia de ganho ou de perda.")
+    fator_ganho = 1 + (ganho_pct / 100.0)
+    fator_perda = 1 - (perda_pct / 100.0)
     bloco_ganhos = [fator_ganho] * dias_ganho
     bloco_perdas = [fator_perda] * dias_perda
     if comeca_por == "Ganho":
@@ -152,16 +155,16 @@ with d7:
 st.subheader("Ciclo de ganhos e perdas")
 cc1, cc2, cc3 = st.columns([1,1,1])
 with cc1:
-    ganho_pct_str = st.text_input("Percentual de ganho (ex.: 20,00%)", value="20,00%")
+    ganho_pct_txt = st.text_input("Percentual de ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)", value="20,00%")
 with cc2:
-    perda_pct_str = st.text_input("Percentual de perda (ex.: -15,00%)", value="-15,00%")
+    perda_pct_txt = st.text_input("Percentual de perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)", value="-15,00%")
 with cc3:
     comeca_por = st.radio("Ciclo começa por:", options=["Ganho", "Perda"], index=0, horizontal=True)
 
 dias_ganho = st.number_input("Qtd. dias de ganho no ciclo", min_value=0, value=2, step=1)
 dias_perda = st.number_input("Qtd. dias de perda no ciclo", min_value=0, value=1, step=1)
 
-st.caption("Ex.: Para 2 ganhos e 1 perda, informe ganho=2 e perda=1. Percentuais no formato BR.")
+st.caption("Ex.: Para 2 ganhos e 1 perda, informe ganho=2 e perda=1. Digite apenas números; a vírgula com duas casas é inserida automaticamente (ex.: 2000 → 20,00).")
 
 erro = None
 ciclo = []
@@ -169,7 +172,9 @@ if data_erro:
     st.error(data_erro)
 else:
     try:
-        ciclo = construir_ciclo(ganho_pct_str, perda_pct_str, dias_ganho, dias_perda, comeca_por)
+        ganho_pct = _pct_str_br_to_float(st.session_state.get('ganho_pct_txt', ganho_pct_txt))
+        perda_pct = _pct_str_br_to_float(st.session_state.get('perda_pct_txt', perda_pct_txt))
+        ciclo = construir_ciclo(ganho_pct, perda_pct, dias_ganho, dias_perda, comeca_por)
         st.write("Ciclo multiplicativo:", ciclo)
     except Exception as e:
         erro = str(e)
