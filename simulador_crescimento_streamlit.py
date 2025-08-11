@@ -254,24 +254,7 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
 
         with container:
             st.pyplot(fig, use_container_width=True)
-
-        # ----- Tabela com rolagem (st.dataframe) -----
-        df_view = df_ops.copy()
-        df_view["Data"] = pd.to_datetime(df_view["Data"]).dt.strftime("%d/%m/%Y")
-        df_view["Variação (%)"] = df_view["Variação (%)"].map(lambda v: f"{br_num(v)}%")
-        df_view["Valor (R$)"] = df_view["Valor (R$)"].map(lambda v: f"R$ {br_num(v)}")
-        df_view = df_view[["Data","Tipo","Variação (%)","Valor (R$)"]]
-        df_view.reset_index(drop=True, inplace=True)
-
-        def _row_style(row):
-            bg = "#063a1a" if row["Tipo"]=="Ganho" else ("#3a0b0b" if row["Tipo"]=="Perda" else "#111217")
-            return [f"background-color: {bg}; color: white;" for _ in row]
-
-        styled = df_view.style.apply(_row_style, axis=1).hide(axis="index")
-        with container:
-            st.dataframe(styled, use_container_width=True, height=520)
-
-        # ----- Resumo final (cartão + tabela) -----
+# ----- Resumo final (cartão + tabela) -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         lucro = valor_final - valor_inicial
         retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
@@ -313,7 +296,26 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
         with container:
             st.plotly_chart(fig_sum, use_container_width=True)
 
-# -------------------------------------------------
+
+
+
+        # ----- Tabela com rolagem (st.dataframe) -----
+        df_view = df_ops.copy()
+        df_view["Data"] = pd.to_datetime(df_view["Data"]).dt.strftime("%d/%m/%Y")
+        df_view["Variação (%)"] = df_view["Variação (%)"].map(lambda v: f"{br_num(v)}%")
+        df_view["Valor (R$)"] = df_view["Valor (R$)"].map(lambda v: f"R$ {br_num(v)}")
+        df_view = df_view[["Data","Tipo","Variação (%)","Valor (R$)"]]
+        df_view.reset_index(drop=True, inplace=True)
+
+        def _row_style(row):
+            bg = "#063a1a" if row["Tipo"]=="Ganho" else ("#3a0b0b" if row["Tipo"]=="Perda" else "#111217")
+            return [f"background-color: {bg}; color: white;" for _ in row]
+
+        styled = df_view.style.apply(_row_style, axis=1).hide(axis="index")
+        with container:
+            st.dataframe(styled, use_container_width=True, height=520)
+
+        # -------------------------------------------------
 # Aviso
 # -------------------------------------------------
 st.caption("⚠️ Este simulador é uma ferramenta educacional. Jogos de azar envolvem risco real de perda. Gerencie sua banca com responsabilidade.")
