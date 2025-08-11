@@ -330,7 +330,7 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
                 values=[summary_labels, summary_vals],
                 align=["left","right"],
                 fill_color=[["#111217"]*5, ["#111217"]*5],
-                font=dict(color=font_colors, size=font_sizes, family=font_families)
+                font=dict(color=font_colors, size=font_sizes)
             )
         )])
         fig_sum.update_layout(margin=dict(l=0,r=0,t=0,b=0))
