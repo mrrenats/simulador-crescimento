@@ -279,48 +279,63 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
 
 
         
-# ----- Resumo final (cartão + tabela) -----
+                # ----- Resumo final em tabela (inclui Valor final como 1ª linha) -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         lucro = valor_final - valor_inicial
         retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
         num_ops = int(len(df_ops))
         retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-
-        # Cartão destacado do valor final ANTES da tabela-resumo
-        card_class = "aviator-card aviator-win" if lucro >= 0 else "aviator-card aviator-loss"
-        st.markdown(
-            f"<div class='{card_class}'><span class='aviator-label'>Valor final:</span> "
-            f"<span class='aviator-value'>R$ {br_num(valor_final)}</span></div>",
-            unsafe_allow_html=True
-        )
-
-        # Tabela-resumo com cores no lucro/retorno
+        # Linhas do resumo (Valor final vem primeiro)
         summary_labels = [
+            "Valor final",
             "Lucro/Prejuízo",
             "Retorno (%)",
             "Nº de operações",
             "Retorno médio/operação"
         ]
         summary_vals = [
+            f"R$ {br_num(valor_final)}",
             f"R$ {br_num(lucro)}",
             f"{br_num(retorno_pct)}%",
             f"{num_ops}",
             f"{br_num(retorno_medio_op)}%"
         ]
+        # Cores condicionais por linha (aplicadas à COLUNA de valores)
         lucro_color = "#16a34a" if lucro >= 0 else "#dc2626"
         retorno_color = "#16a34a" if retorno_pct >= 0 else "#dc2626"
         retorno_medio_color = "#16a34a" if retorno_medio_op >= 0 else "#dc2626"
-        font_colors = [["#e5e7eb"]*4, ["#e5e7eb", lucro_color, retorno_color, "#e5e7eb", retorno_medio_color]][:2]  # proteção
-
+        # Fonte: ligeiramente maior na 1ª linha (valor final) e família 'Arial Black' para simular bold
+        # Tabela tem 5 linhas; criamos matrizes 2 (colunas) x 5 (linhas)
+        font_colors = [
+            ["#e5e7eb"]*5,  # coluna de rótulos
+            ["#e5e7eb", lucro_color, retorno_color, "#e5e7eb", retorno_medio_color]  # coluna de valores
+        ]
+        font_sizes = [
+            [16,16,16,16,16],  # rótulos
+            [18,16,16,16,16]   # valores (primeira linha maior)
+        ]
+        font_families = [
+            ["Arial"]*5,
+            ["Arial Black","Arial","Arial","Arial","Arial"]
+        ]
         fig_sum = go.Figure(data=[go.Table(
-            header=dict(values=[f"Resumo até {data_final}", ""], fill_color="#1f2430", align=["left","right"], font=dict(color="#e5e7eb")),
-            cells=dict(values=[summary_labels, summary_vals], align=["left","right"], fill_color=[["#111217"]*4, ["#111217"]*4], font=dict(color=[["#e5e7eb"]*4, ["#e5e7eb", lucro_color, retorno_color, "#e5e7eb"]]))
+            header=dict(
+                values=[f"Resumo até {data_final}", ""],
+                fill_color="#1f2430",
+                align=["left","right"],
+                font=dict(color="#e5e7eb", size=16)
+            ),
+            cells=dict(
+                values=[summary_labels, summary_vals],
+                align=["left","right"],
+                fill_color=[["#111217"]*5, ["#111217"]*5],
+                font=dict(color=font_colors, size=font_sizes, family=font_families)
+            )
         )])
         fig_sum.update_layout(margin=dict(l=0,r=0,t=0,b=0))
         with container:
             st.plotly_chart(fig_sum, use_container_width=True)
-
 # -------------------------------------------------
 # Aviso
 # -------------------------------------------------
