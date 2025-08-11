@@ -255,7 +255,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
             bg = "#e6ffe6" if row["Tipo"]=="Ganho" else ("#ffe6e6" if row["Tipo"]=="Perda" else "#ffffff")
             return [f"background-color: {bg}; color: black;" for _ in row]
 
-        styled = df_view.style.apply(_row_style, axis=1)
+        styled = df_view.style.apply(_row_style, axis=1).hide(axis="index")
         with container:
             st.dataframe(styled, use_container_width=True, height=520)
 
@@ -266,6 +266,14 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         num_ops = int(len(df_ops))
         retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
+        # ---- Destaque visual do Valor Final ----
+        st.markdown(
+            f"<div class='total-highlight'>"
+            f"<span class='label'>Valor final:</span> "
+            f"<span class='value'>R$ {br_num(valor_final)}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
 
         summary_labels = [
             "Valor final",
