@@ -294,7 +294,16 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         retorno_medio_color = "#1a7f37" if retorno_medio_op >= 0 else "#b91c1c"
         font_colors = [["black"]*5, ["black", lucro_color, retorno_color, "black", retorno_medio_color]]
 
-        fig_sum = go.Figure(data=[go.Table(
+                # ---- Destaque visual do Valor Final ----
+        st.markdown(
+            f"<div class='total-highlight'>"
+            f"<span class='label'>Valor final:</span> "
+            f"<span class='value'>R$ {br_num(valor_final)}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+fig_sum = go.Figure(data=[go.Table(
             header=dict(values=[f"Resumo até {data_final}", ""], fill_color="#f0f0f0", align=["left","right"], font=dict(color="black")),
             cells=dict(values=[summary_labels, summary_vals], align=["left","right"], fill_color=[["white"]*5, ["white"]*5], font=dict(color=font_colors))
         )])
