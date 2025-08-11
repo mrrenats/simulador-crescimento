@@ -247,6 +247,8 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         df_view["Variação (%)"] = df_view["Variação (%)"].map(lambda v: f"{br_num(v)}%")
         df_view["Valor (R$)"] = df_view["Valor (R$)"].map(lambda v: f"R$ {br_num(v)}")
         df_view = df_view[["Data","Tipo","Variação (%)","Valor (R$)"]]
+        # remover índice numérico das linhas
+        df_view.reset_index(drop=True, inplace=True)
 
         # Tentativa de estilos por linha (algumas versões do Streamlit exibem Styler dentro do dataframe; se não, tudo segue legível)
         def _row_style(row):
