@@ -8,30 +8,40 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import re
 
-APP_TITLE = "Simulador de ganhos e perdas do Aviator"
-DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"
+# -------------------------------------------------
+# Identidade visual Aviator
+# -------------------------------------------------
+APP_TITLE = "✈️ Simulador Aviator — ganhos e perdas"
+DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"  # já enviada por você
 
 st.title(APP_TITLE)
+st.caption("Simule ciclos de ganhos e perdas e veja a evolução da banca como se estivesse no Aviator.")
 
-# ---------- CSS mínimo para destaque do total ----------
+# Paleta e estilos (Aviator: vermelho/escuro)
 st.markdown(
     """
     <style>
-      .total-highlight {
-          background:#eef8ff;
-          border:1px solid #cce6ff;
-          padding:14px 16px;
-          border-radius:8px;
-          margin-top:8px;
+      .aviator-card {
+          background: #111217;
+          border: 1px solid #2b2f3a;
+          padding: 14px 16px;
+          border-radius: 10px;
+          margin: 8px 0 0 0;
       }
-      .total-highlight .label { font-size:1rem; color:#1b4d8a; font-weight:600; }
-      .total-highlight .value { font-size:2rem; font-weight:800; color:#0b2e59; }
+      .aviator-label { font-size: 0.95rem; color: #b3b9c5; font-weight: 600; }
+      .aviator-value { font-size: 2rem; font-weight: 800; color: #ffffff; }
+      .aviator-win { border-color: #16a34a; box-shadow: 0 0 0 1px #16a34a inset; }
+      .aviator-loss { border-color: #dc2626; box-shadow: 0 0 0 1px #dc2626 inset; }
+      .aviator-section { color:#e5e7eb; font-weight:700; margin-top: 6px;}
+      .aviator-help { color:#9aa3af; }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# ---------- Utilidades ----------
+# -------------------------------------------------
+# Utilidades
+# -------------------------------------------------
 def parse_data_br(txt: str) -> datetime:
     s = (txt or "").strip()
     if not re.fullmatch(r"\d{2}/\d{2}/\d{4}", s):
@@ -121,17 +131,19 @@ def _pct_str_br_to_float(pct_txt: str) -> float:
         raise ValueError("Percentual inválido. Digite apenas números; a vírgula entra automaticamente (ex.: 20 → 20,00).")
     return round(val, 2)
 
-# ---------- Entradas ----------
+# -------------------------------------------------
+# Entradas
+# -------------------------------------------------
 hoje = datetime.now().strftime("%d/%m/%Y")
 
-st.subheader("Período e valor inicial")
+st.subheader("🎯 Banca inicial e período", anchor=False)
 c1, c2, c3 = st.columns([1,1,1])
 with c1:
-    valor_inicial = st.number_input("Valor inicial (R$)", min_value=0.0, value=200.0, step=100.0)
+    valor_inicial = st.number_input("Banca inicial (R$)", min_value=0.0, value=200.0, step=100.0)
 with c2:
-    data_inicio_txt = st.text_input("Data de início (dd/mm/aaaa)", value=hoje)
+    data_inicio_txt = st.text_input("Início (dd/mm/aaaa)", value=hoje)
 with c3:
-    data_fim_txt = st.text_input("Data de fim (dd/mm/aaaa)", value="", key="data_fim_txt", on_change=_format_data_fim_on_change)
+    data_fim_txt = st.text_input("Fim (dd/mm/aaaa)", value="", key="data_fim_txt", on_change=_format_data_fim_on_change)
 
 fim_txt = st.session_state.get("data_fim_txt", data_fim_txt)
 
@@ -151,7 +163,7 @@ except Exception as e:
 
 st.caption(f"Período selecionado: {data_inicio_txt} — {fim_txt or '(defina a data de fim)'}")
 
-st.subheader("Dias com operações")
+st.subheader("📅 Dias com operações", anchor=False)
 dias_ativos = []
 d1, d2, d3, d4, d5, d6, d7 = st.columns(7)
 with d1:
@@ -169,13 +181,13 @@ with d6:
 with d7:
     if st.checkbox("Dom", value=False): dias_ativos.append(6)
 
-st.subheader("Ciclo de ganhos e perdas")
+st.subheader("🧠 Estratégia (ciclo)", anchor=False)
 # Seletores de dias (0-10), antes dos percentuais
 dd1, dd2 = st.columns([1,1])
 with dd1:
-    dias_ganho = st.selectbox("Qtd. dias de ganho no ciclo", options=list(range(0, 11)), index=2)
+    dias_ganho = st.selectbox("Dias de ganho por ciclo", options=list(range(0, 11)), index=2)
 with dd2:
-    dias_perda = st.selectbox("Qtd. dias de perda no ciclo", options=list(range(0, 11)), index=1)
+    dias_perda = st.selectbox("Dias de perda por ciclo", options=list(range(0, 11)), index=1)
 
 # Validação: não permitir 0 e 0 simultaneamente
 if dias_ganho == 0 and dias_perda == 0:
@@ -184,13 +196,13 @@ if dias_ganho == 0 and dias_perda == 0:
 
 cc1, cc2, cc3 = st.columns([1,1,1])
 with cc1:
-    ganho_pct_txt = st.text_input("Percentual de ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)
+    ganho_pct_txt = st.text_input("Ganho (%)", value="20,00", key="ganho_pct_txt", on_change=_format_pct_on_change_ganho)
 with cc2:
-    perda_pct_txt = st.text_input("Percentual de perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)
+    perda_pct_txt = st.text_input("Perda (%)", value="15,00", key="perda_pct_txt", on_change=_format_pct_on_change_perda)
 with cc3:
     comeca_por = st.radio("Ciclo começa por:", options=["Ganho", "Perda"], index=0, horizontal=True)
 
-st.caption("Ex.: Para 2 ganhos e 1 perda, use os seletores acima. Percentuais: digite só números; a vírgula com duas casas é automática (ex.: 15 → 15,00).")
+st.caption("Dica: Digite só números; a vírgula com duas casas é automática (ex.: 15 → 15,00).")
 
 erro = None
 ciclo = []
@@ -204,10 +216,12 @@ else:
         st.write("Ciclo multiplicativo:", ciclo)
     except Exception as e:
         erro = str(e)
-        st.error(erro)
+        st.error(e)
 
-# ---------- Execução ----------
-if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
+# -------------------------------------------------
+# Execução
+# -------------------------------------------------
+if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fim is not None:
     df_ops = simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo)
 
     if df_ops.empty:
@@ -215,7 +229,7 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
     else:
         container = st.container()
 
-        # ----- Gráfico com fundo -----
+        # ----- Gráfico com fundo (tema Aviator escuro) -----
         fig, ax = plt.subplots(figsize=(10, 4))
 
         bg_img = None
@@ -229,13 +243,13 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
             ax.imshow(bg_img, extent=(0, 1, 0, 1), transform=ax.transAxes, zorder=0)
             line_color = "white"
         else:
-            ax.set_facecolor("#111111")
+            ax.set_facecolor("#0b0d12")
             line_color = "white"
 
-        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.5, color=line_color, zorder=1)
+        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.6, color=line_color, zorder=1)
         ax.set_xlabel("Data")
-        ax.set_ylabel("Valor (R$)")
-        ax.grid(True, alpha=0.3)
+        ax.set_ylabel("Banca (R$)")
+        ax.grid(True, alpha=0.25)
         fig.autofmt_xdate()
 
         with container:
@@ -247,66 +261,59 @@ if st.button("Simular") and not (erro or data_erro) and data_fim is not None:
         df_view["Variação (%)"] = df_view["Variação (%)"].map(lambda v: f"{br_num(v)}%")
         df_view["Valor (R$)"] = df_view["Valor (R$)"].map(lambda v: f"R$ {br_num(v)}")
         df_view = df_view[["Data","Tipo","Variação (%)","Valor (R$)"]]
-        # remover índice numérico das linhas
         df_view.reset_index(drop=True, inplace=True)
 
-        # Tentativa de estilos por linha (algumas versões do Streamlit exibem Styler dentro do dataframe; se não, tudo segue legível)
         def _row_style(row):
-            bg = "#e6ffe6" if row["Tipo"]=="Ganho" else ("#ffe6e6" if row["Tipo"]=="Perda" else "#ffffff")
-            return [f"background-color: {bg}; color: black;" for _ in row]
+            bg = "#063a1a" if row["Tipo"]=="Ganho" else ("#3a0b0b" if row["Tipo"]=="Perda" else "#111217")
+            return [f"background-color: {bg}; color: white;" for _ in row]
 
         styled = df_view.style.apply(_row_style, axis=1).hide(axis="index")
         with container:
             st.dataframe(styled, use_container_width=True, height=520)
 
-        # ----- Resumo final em tabela (valor final, lucro/prejuízo, retorno %, nº operações, retorno médio/operação) -----
+        # ----- Resumo final (cartão + tabela) -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         lucro = valor_final - valor_inicial
         retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
         num_ops = int(len(df_ops))
         retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
-        # ---- Destaque visual do Valor Final ----
+
+        # Cartão destacado do valor final ANTES da tabela-resumo
+        card_class = "aviator-card aviator-win" if lucro >= 0 else "aviator-card aviator-loss"
         st.markdown(
-            f"<div class='total-highlight'>"
-            f"<span class='label'>Valor final:</span> "
-            f"<span class='value'>R$ {br_num(valor_final)}</span>"
-            f"</div>",
+            f"<div class='{card_class}'><span class='aviator-label'>Valor final:</span> "
+            f"<span class='aviator-value'>R$ {br_num(valor_final)}</span></div>",
             unsafe_allow_html=True
         )
 
+        # Tabela-resumo com cores no lucro/retorno
         summary_labels = [
-            "Valor final",
             "Lucro/Prejuízo",
             "Retorno (%)",
             "Nº de operações",
             "Retorno médio/operação"
         ]
         summary_vals = [
-            f"R$ {br_num(valor_final)}",
             f"R$ {br_num(lucro)}",
             f"{br_num(retorno_pct)}%",
             f"{num_ops}",
             f"{br_num(retorno_medio_op)}%"
         ]
-        lucro_color = "#1a7f37" if lucro >= 0 else "#b91c1c"
-        retorno_color = "#1a7f37" if retorno_pct >= 0 else "#b91c1c"
-        retorno_medio_color = "#1a7f37" if retorno_medio_op >= 0 else "#b91c1c"
-        font_colors = [["black"]*5, ["black", lucro_color, retorno_color, "black", retorno_medio_color]]
+        lucro_color = "#16a34a" if lucro >= 0 else "#dc2626"
+        retorno_color = "#16a34a" if retorno_pct >= 0 else "#dc2626"
+        retorno_medio_color = "#16a34a" if retorno_medio_op >= 0 else "#dc2626"
+        font_colors = [["#e5e7eb"]*4, ["#e5e7eb", lucro_color, retorno_color, "#e5e7eb", retorno_medio_color]][:2]  # proteção
 
-                # ---- Destaque visual do Valor Final ----
-        st.markdown(
-            f"<div class='total-highlight'>"
-            f"<span class='label'>Valor final:</span> "
-            f"<span class='value'>R$ {br_num(valor_final)}</span>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-
-fig_sum = go.Figure(data=[go.Table(
-            header=dict(values=[f"Resumo até {data_final}", ""], fill_color="#f0f0f0", align=["left","right"], font=dict(color="black")),
-            cells=dict(values=[summary_labels, summary_vals], align=["left","right"], fill_color=[["white"]*5, ["white"]*5], font=dict(color=font_colors))
+        fig_sum = go.Figure(data=[go.Table(
+            header=dict(values=[f"Resumo até {data_final}", ""], fill_color="#1f2430", align=["left","right"], font=dict(color="#e5e7eb")),
+            cells=dict(values=[summary_labels, summary_vals], align=["left","right"], fill_color=[["#111217"]*4, ["#111217"]*4], font=dict(color=[["#e5e7eb"]*4, ["#e5e7eb", lucro_color, retorno_color, "#e5e7eb"]]))
         )])
         fig_sum.update_layout(margin=dict(l=0,r=0,t=0,b=0))
         with container:
             st.plotly_chart(fig_sum, use_container_width=True)
+
+# -------------------------------------------------
+# Aviso
+# -------------------------------------------------
+st.caption("⚠️ Este simulador é uma ferramenta educacional. Jogos de azar envolvem risco real de perda. Gerencie sua banca com responsabilidade.")
