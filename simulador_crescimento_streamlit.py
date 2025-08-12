@@ -6,12 +6,13 @@ from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
 import re
+import io
 
 # =============================
 # Config / Tema (Aviator)
 # =============================
 APP_TITLE = "✈️ Simulador Aviator — ganhos e perdas"
-DEFAULT_BG = "/mnt/data/fundo_grafico.jpg"  # se existir, é usado no fundo do gráfico
+DEFAULT_BG = "fundo_grafico.jpg"  # se existir no diretório do app, é usado como fundo do gráfico
 
 st.set_page_config(page_title=APP_TITLE, layout="wide")
 st.title(APP_TITLE)
@@ -31,14 +32,19 @@ def construir_ciclo(ganho_pct: float, perda_pct: float, dias_ganho: int, dias_pe
         raise ValueError("A quantidade de dias deve ser não negativa.")
     if dias_ganho == 0 and dias_perda == 0:
         raise ValueError("Defina ao menos um dia de ganho ou de perda.")
+    # validações mais fortes
+    if ganho_pct < 0 or perda_pct < 0:
+        raise ValueError("Percentuais não podem ser negativos.")
+    if perda_pct >= 100:
+        raise ValueError("Perda (%) deve ser menor que 100 para evitar fator negativo/zero.")
+    if ganho_pct > 500:
+        raise ValueError("Ganho (%) muito alto. Defina um valor <= 500%.")
+
     fator_ganho = 1 + (ganho_pct / 100.0)
     fator_perda = 1 - (perda_pct / 100.0)
     bloco_ganhos = [fator_ganho] * dias_ganho
     bloco_perdas = [fator_perda] * dias_perda
-    if comeca_por == "Ganho":
-        ciclo = bloco_ganhos + bloco_perdas
-    else:
-        ciclo = bloco_perdas + bloco_ganhos
+    ciclo = (bloco_ganhos + bloco_perdas) if comeca_por == "Ganho" else (bloco_perdas + bloco_ganhos)
     return ciclo
 
 def simular_operacoes(valor_inicial, data_inicio, data_fim, dias_ativos, ciclo):
@@ -145,6 +151,9 @@ with d6:
 with d7:
     if st.checkbox("Dom", value=False): dias_ativos.append(6)
 
+if len(dias_ativos) == 0:
+    st.warning("Selecione pelo menos um dia da semana para operar.")
+
 st.subheader("🧠 Estratégia (ciclo)", anchor=False)
 dd1, dd2 = st.columns([1,1])
 with dd1:
@@ -175,7 +184,8 @@ else:
         ganho_pct = _pct_str_br_to_float(st.session_state.get("ganho_pct_txt", ganho_pct_txt))
         perda_pct = _pct_str_br_to_float(st.session_state.get("perda_pct_txt", perda_pct_txt))
         ciclo = construir_ciclo(ganho_pct, perda_pct, dias_ganho, dias_perda, comeca_por)
-        st.write("Ciclo multiplicativo:", ciclo)
+        with st.expander("Ver detalhes do ciclo", expanded=False):
+            st.write("Fatores multiplicativos do ciclo:", [round(f, 4) for f in ciclo])
     except Exception as e:
         erro = str(e)
         st.error(e)
@@ -189,6 +199,19 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
     if df_ops.empty:
         st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
     else:
+        # KPIs rápidos
+        valor_final = df_ops["Valor (R$)"].iloc[-1]
+        lucro = valor_final - valor_inicial
+        retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
+        num_ops = int(len(df_ops))
+        retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Valor final (R$)", br_num(valor_final))
+        k2.metric("Lucro/Prejuízo (R$)", br_num(lucro))
+        k3.metric("Retorno (%)", f"{br_num(retorno_pct)}%")
+        k4.metric("Operações", f"{num_ops}")
+
         container = st.container()
 
         # ----- Gráfico com fundo (tema Aviator) -----
@@ -234,14 +257,9 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
             styled = df_view.style.apply(_row_style, axis=1).hide_index()
 
         with container:
-            st.dataframe(styled, use_container_width=True, height=520)
+            st.markdown(styled.to_html(), unsafe_allow_html=True)
 
         # ----- Resumo (HTML) — Valor final como 1ª linha -----
-        valor_final = df_ops["Valor (R$)"].iloc[-1]
-        lucro = valor_final - valor_inicial
-        retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
-        num_ops = int(len(df_ops))
-        retorno_medio_op = float(df_ops["Variação (%)"].mean()) if num_ops > 0 else 0.0
         data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
 
         lucro_color = "#16a34a" if lucro >= 0 else "#dc2626"
@@ -284,3 +302,42 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
         """
         with container:
             st.markdown(resumo_html, unsafe_allow_html=True)
+
+        # ----- Exportações -----
+        csv_bytes = df_ops.copy()
+        csv_bytes["Data"] = pd.to_datetime(csv_bytes["Data"]).dt.strftime("%d/%m/%Y")
+        csv_bytes = csv_bytes.to_csv(index=False).encode("utf-8-sig")
+
+        st.download_button(
+            label="⬇️ Baixar operações (CSV)",
+            data=csv_bytes,
+            file_name="operacoes_simuladas.csv",
+            mime="text/csv"
+        )
+
+        # Snapshot em Excel com resumo na 1ª aba e operações na 2ª
+        with io.BytesIO() as buffer:
+            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+                resumo_df = pd.DataFrame({
+                    "Métrica": ["Valor inicial", "Valor final", "Lucro/Prejuízo", "Retorno (%)", "Operações", "Retorno médio/op."],
+                    "Valor": [valor_inicial, valor_final, lucro, retorno_pct, num_ops, retorno_medio_op]
+                })
+                resumo_fmt = resumo_df.copy()
+                resumo_fmt.loc[:, "Valor"] = [
+                    f"R$ {br_num(valor_inicial)}",
+                    f"R$ {br_num(valor_final)}",
+                    f"R$ {br_num(lucro)}",
+                    f"{br_num(retorno_pct)}%",
+                    f"{num_ops}",
+                    f"{br_num(retorno_medio_op)}%",
+                ]
+                resumo_fmt.to_excel(writer, sheet_name="Resumo", index=False)
+                df_ops.to_excel(writer, sheet_name="Operações", index=False)
+            excel_bytes = buffer.getvalue()
+
+        st.download_button(
+            label="⬇️ Baixar planilha (XLSX)",
+            data=excel_bytes,
+            file_name="simulacao_aviator.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
