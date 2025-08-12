@@ -1,7 +1,6 @@
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-import matplotlib.dates as md, matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 import streamlit as st
@@ -56,6 +55,32 @@ def sty(df):
     colgroup = "<colgroup><col style='width:18%'><col style='width:22%'><col style='width:30%'><col style='width:30%'></colgroup>"
     html = html.replace("<table", "<table>" + colgroup, 1)
     return html
+
+def rhtml(df,vf,l,rt,n,rm):
+    C=lambda x:"#16a34a" if x>=0 else"#dc2626"
+    dt=pd.to_datetime(df["Data"]).iloc[-1].strftime("%d/%m/%Y")
+    return (
+        "<div style='width:100%'>"
+        "<table style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'>"
+        "<thead><tr>"
+        "<th style='text-align:left;padding:10px;background:#1f2430;font-weight:700'>Resumo até "+dt+"</th>"
+        "<th style='text-align:right;padding:10px;background:#1f2430;font-weight:700'></th>"
+        "</tr></thead>"
+        "<tbody>"
+        "<tr><td style='padding:10px;background:#111217'>Valor final</td>"
+        "<td style='padding:10px;background:#111217;text-align:right'><span style='font-weight:800;font-size:17px'>R$ "+f(vf)+"</span></td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Lucro/Prejuízo</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:"+C(l)+"'>R$ "+f(l)+"</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Retorno (%)</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:"+C(rt)+"'>"+f(rt)+"%</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Nº de operações</td>"
+        "<td style='padding:10px;background:#111217;text-align:right'>"+str(n)+"</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Retorno médio/operação</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:"+C(rm)+"'>"+f(rm)+"%</td></tr>"
+        "</tbody></table></div>"
+    )
+
+
 # inputs
 hj=datetime.now().strftime("%d/%m/%Y")
 c1,c2,c3=st.columns(3)
@@ -112,5 +137,5 @@ if st.button("Simular estratégia 🚀") and not err and df is not None:
         ax.xaxis.set_major_locator(md.DayLocator(interval=15)); ax.xaxis.set_major_formatter(md.DateFormatter("%d/%m/%Y")); fig.autofmt_xdate()
         st.pyplot(fig, use_container_width=True)
         v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
-        st.markdown("""<div style='width:100%'>""" + sty(v) + """</div>""", unsafe_allow_html=True)
+        st.markdown("<div style='width:100%'>" + sty(v) + "</div>", unsafe_allow_html=True)
         st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
