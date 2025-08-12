@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from PIL import Image
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -184,8 +185,6 @@ else:
         ganho_pct = _pct_str_br_to_float(st.session_state.get("ganho_pct_txt", ganho_pct_txt))
         perda_pct = _pct_str_br_to_float(st.session_state.get("perda_pct_txt", perda_pct_txt))
         ciclo = construir_ciclo(ganho_pct, perda_pct, dias_ganho, dias_perda, comeca_por)
-        with st.expander("Ver detalhes do ciclo", expanded=False):
-            st.write("Fatores multiplicativos do ciclo:", [round(f, 4) for f in ciclo])
     except Exception as e:
         erro = str(e)
         st.error(e)
@@ -230,16 +229,24 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
             ax.set_facecolor("#0b0d12")
             line_color = "white"
 
-        ax.plot(df_ops["Data"], df_ops["Valor (R$)"], linewidth=2.6, color=line_color, zorder=1)
+        # garantir dtype datetime para eixo X
+        x = pd.to_datetime(df_ops["Data"])
+        y = df_ops["Valor (R$)"].values
+
+        ax.plot(x, y, linewidth=2.6, color=line_color, zorder=1)
         ax.set_xlabel("Data")
         ax.set_ylabel("Banca (R$)")
         ax.grid(True, alpha=0.25)
+
+        # Ticks de 15 em 15 dias
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=15))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%d/%m/%Y"))
         fig.autofmt_xdate()
 
         with container:
             st.pyplot(fig, use_container_width=True)
 
-        # ----- Tabela detalhada (rolável, sem índice, colorida por ganho/perda) -----
+        # ----- Tabela detalhada (100% largura, cores) -----
         df_view = df_ops.copy()
         df_view["Data"] = pd.to_datetime(df_view["Data"]).dt.strftime("%d/%m/%Y")
         df_view["Variação (%)"] = df_view["Variação (%)"].map(lambda v: f"{br_num(v)}%")
@@ -252,15 +259,29 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
             return [f"background-color: {bg}; color: white;" for _ in row]
 
         try:
-            styled = df_view.style.apply(_row_style, axis=1).hide(axis="index")
+            styled = (
+                df_view.style
+                .apply(_row_style, axis=1)
+                .hide(axis="index")
+                .set_table_styles([
+                    {"selector": "table", "props": [("width", "100%")]},
+                    {"selector": "th", "props": [("background-color", "#1f2430"), ("color", "white"), ("text-align", "left")]},
+                    {"selector": "td", "props": [("padding", "6px 8px")]},
+                ])
+            )
         except Exception:
-            styled = df_view.style.apply(_row_style, axis=1).hide_index()
+            styled = (
+                df_view.style
+                .apply(_row_style, axis=1)
+                .hide_index()
+                .set_table_styles([{"selector": "table", "props": [("width", "100%")]}])
+            )
 
         with container:
             st.markdown(styled.to_html(), unsafe_allow_html=True)
 
         # ----- Resumo (HTML) — Valor final como 1ª linha -----
-        data_final = df_ops["Data"].iloc[-1].strftime("%d/%m/%Y")
+        data_final = pd.to_datetime(df_ops["Data"]).iloc[-1].strftime("%d/%m/%Y")
 
         lucro_color = "#16a34a" if lucro >= 0 else "#dc2626"
         retorno_color = "#16a34a" if retorno_pct >= 0 else "#dc2626"
@@ -302,42 +323,3 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
         """
         with container:
             st.markdown(resumo_html, unsafe_allow_html=True)
-
-        # ----- Exportações -----
-        csv_bytes = df_ops.copy()
-        csv_bytes["Data"] = pd.to_datetime(csv_bytes["Data"]).dt.strftime("%d/%m/%Y")
-        csv_bytes = csv_bytes.to_csv(index=False).encode("utf-8-sig")
-
-        st.download_button(
-            label="⬇️ Baixar operações (CSV)",
-            data=csv_bytes,
-            file_name="operacoes_simuladas.csv",
-            mime="text/csv"
-        )
-
-        # Snapshot em Excel com resumo na 1ª aba e operações na 2ª
-        with io.BytesIO() as buffer:
-            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                resumo_df = pd.DataFrame({
-                    "Métrica": ["Valor inicial", "Valor final", "Lucro/Prejuízo", "Retorno (%)", "Operações", "Retorno médio/op."],
-                    "Valor": [valor_inicial, valor_final, lucro, retorno_pct, num_ops, retorno_medio_op]
-                })
-                resumo_fmt = resumo_df.copy()
-                resumo_fmt.loc[:, "Valor"] = [
-                    f"R$ {br_num(valor_inicial)}",
-                    f"R$ {br_num(valor_final)}",
-                    f"R$ {br_num(lucro)}",
-                    f"{br_num(retorno_pct)}%",
-                    f"{num_ops}",
-                    f"{br_num(retorno_medio_op)}%",
-                ]
-                resumo_fmt.to_excel(writer, sheet_name="Resumo", index=False)
-                df_ops.to_excel(writer, sheet_name="Operações", index=False)
-            excel_bytes = buffer.getvalue()
-
-        st.download_button(
-            label="⬇️ Baixar planilha (XLSX)",
-            data=excel_bytes,
-            file_name="simulacao_aviator.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
