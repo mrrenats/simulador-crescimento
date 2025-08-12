@@ -112,5 +112,5 @@ if st.button("Simular estratégia 🚀") and not err and df is not None:
         ax.xaxis.set_major_locator(md.DayLocator(interval=15)); ax.xaxis.set_major_formatter(md.DateFormatter("%d/%m/%Y")); fig.autofmt_xdate()
         st.pyplot(fig, use_container_width=True)
         v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
-        st.markdown(\"\"\"<div style='width:100%'>\"\"\" + sty(v) + \"\"\"</div>\"\"\", unsafe_allow_html=True)
+        st.markdown("""<div style='width:100%'>""" + sty(v) + """</div>""", unsafe_allow_html=True)
         st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
