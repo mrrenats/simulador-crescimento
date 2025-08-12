@@ -38,30 +38,24 @@ def mpc(k):
     t=st.session_state.get(k,""); d="".join(ch for ch in t if ch.isdigit())[:6]; st.session_state[k]=(f"{int(d)},00" if d else "")
 def sty(df):
     def rs(r):
-        bg = "#063a1a" if r["Tipo"]=="Ganho" else ("#3a0b0b" if r["Tipo"]=="Perda" else "#111217")
+        bg = "#063a1a" if r["Tipo"] == "Ganho" else ("#3a0b0b" if r["Tipo"] == "Perda" else "#111217")
         return [f"background-color:{bg};color:white;" for _ in r]
     base_styles = [
-        {"selector":"table","props":[("width","100%"),("table-layout","fixed"),("border-collapse","collapse"),
-                                    ("font-family","system-ui,-apple-system,Segoe UI,Roboto,Arial"),("color","#e5e7eb")]},
-        {"selector":"th","props":[("background","#1f2430"),("color","white"),("text-align","left"),("padding","8px 10px")]},
-        {"selector":"td","props":[("padding","6px 8px")]},
+        {"selector": "table", "props": [("width", "100%"), ("table-layout", "fixed"), ("border-collapse", "collapse"),
+                                        ("font-family", "system-ui,-apple-system,Segoe UI,Roboto,Arial"), ("color", "#e5e7eb")]},
+        {"selector": "th", "props": [("background", "#1f2430"), ("color", "white"), ("text-align", "left"), ("padding", "8px 10px")]},
+        {"selector": "td", "props": [("padding", "6px 8px")]},
+        {"selector":"td:nth-child(3)", "props":[("text-align","right")]},
+        {"selector":"td:nth-child(4)", "props":[("text-align","right")]},
+        {"selector":"td:nth-child(2)", "props":[("text-align","center")]},
     ]
     try:
         html = df.style.apply(rs, axis=1).hide(axis="index").set_table_styles(base_styles).to_html()
-    colgroup = "<colgroup><col style='width:18%'><col style='width:22%'><col style='width:30%'><col style='width:30%'></colgroup>"
-    html = html.replace("<table", "<table>" + colgroup, 1)
-    return html
     except Exception:
         html = df.style.apply(rs, axis=1).hide_index().set_table_styles(base_styles).to_html()
     colgroup = "<colgroup><col style='width:18%'><col style='width:22%'><col style='width:30%'><col style='width:30%'></colgroup>"
     html = html.replace("<table", "<table>" + colgroup, 1)
     return html
-.apply(rs,axis=1).hide(axis="index").set_table_styles([{"selector":"table","props":[("width","100%")]},{"selector":"th","props":[("background","#1f2430"),("color","white"),("text-align","left")]},{"selector":"td","props":[("padding","6px 8px")]}])
-    except Exception: return df.style.apply(rs,axis=1).hide_index().set_table_styles([{"selector":"table","props":[("width","100%"),("table-layout","fixed")]}])
-def rhtml(df,vf,l,rt,n,rm):
-    C=lambda x:"#16a34a" if x>=0 else"#dc2626"; dt=pd.to_datetime(df["Data"]).iloc[-1].strftime("%d/%m/%Y")
-    return f"<div style='width:100%'><table style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'><thead><tr><th style='text-align:left;padding:10px;background:#1f2430;font-weight:700'>Resumo até {dt}</th><th style='text-align:right;padding:10px;background:#1f2430;font-weight:700'></th></tr></thead><tbody><tr><td style='padding:10px;background:#111217'>Valor final</td><td style='padding:10px;background:#111217;text-align:right'><span style='font-weight:800;font-size:17px'>R$ {f(vf)}</span></td></tr><tr><td style='padding:10px;background:#111217'>Lucro/Prejuízo</td><td style='padding:10px;background:#111217;text-align:right;color:{C(l)}'>R$ {f(l)}</td></tr><tr><td style='padding:10px;background:#111217'>Retorno (%)</td><td style='padding:10px;background:#111217;text-align:right;color:{C(rt)}'>{f(rt)}%</td></tr><tr><td style='padding:10px;background:#111217'>Nº de operações</td><td style='padding:10px;background:#111217;text-align:right'>{n}</td></tr><tr><td style='padding:10px;background:#111217'>Retorno médio/operação</td><td style='padding:10px;background:#111217;text-align:right;color:{C(rm)}'>{f(rm)}%</td></tr></tbody></table></div>"
-
 # inputs
 hj=datetime.now().strftime("%d/%m/%Y")
 c1,c2,c3=st.columns(3)
@@ -118,5 +112,5 @@ if st.button("Simular estratégia 🚀") and not err and df is not None:
         ax.xaxis.set_major_locator(md.DayLocator(interval=15)); ax.xaxis.set_major_formatter(md.DateFormatter("%d/%m/%Y")); fig.autofmt_xdate()
         st.pyplot(fig, use_container_width=True)
         v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
-        st.markdown(\"\"\"<div style='width:100%'>\"\"\" + sty(v).to_html() + \"\"\"</div>\"\"\", unsafe_allow_html=True)
+        st.markdown(\"\"\"<div style='width:100%'>\"\"\" + sty(v) + \"\"\"</div>\"\"\", unsafe_allow_html=True)
         st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
