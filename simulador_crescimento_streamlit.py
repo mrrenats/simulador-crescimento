@@ -8,6 +8,59 @@ import streamlit as st
 T="✈️ Simulador Aviator — ganhos e perdas"; B="fundo_grafico.jpg"
 st.set_page_config(page_title=T, layout="wide"); st.title(T); st.caption("Simule ciclos de ganhos e perdas e veja a evolução da banca como se estivesse no Aviator.")
 
+# ===== Aviator Theme (CSS) =====
+st.markdown(
+    r"""
+    <style>
+      /* Background: dark cockpit + subtle grid */
+      .stApp {
+        background: radial-gradient(1200px 800px at 20% -10%, rgba(255,46,46,0.12) 0%, rgba(11,13,18,0) 60%),
+                    radial-gradient(1000px 600px at 100% 20%, rgba(255,46,46,0.08) 0%, rgba(11,13,18,0) 60%),
+                    #0b0d12;
+      }
+      /* Headline ribbon */
+      .aviator-ribbon {
+        display:flex; align-items:center; gap:.6rem;
+        padding:10px 14px; border-radius:14px;
+        background: linear-gradient(90deg,#1b202b 0%, #151923 100%);
+        border:1px solid rgba(255,46,46,.25);
+        box-shadow: 0 0 0 1px rgba(255,46,46,.08) inset, 0 8px 24px rgba(0,0,0,.45);
+      }
+      .aviator-title { font-weight:800; letter-spacing:.3px; }
+      .aviator-badge {
+        padding:2px 8px; border-radius:999px; font-size:.75rem;
+        background: rgba(255,46,46,.14); border:1px solid rgba(255,46,46,.35); color:#ff7a7a;
+      }
+      /* KPI cards spacing */
+      section[data-testid="stHorizontalBlock"] > div { gap: .6rem }
+      /* Table & Summary coherence */
+      .aviator-summary th { background:#171b25 !important; color:#ffffff !important; }
+      .aviator-summary td { background:#0f1219 !important; color:#e5e7eb !important; }
+      /* Buttons */
+      .stButton>button {
+        border-radius:12px; border:1px solid rgba(255,46,46,.35);
+        background: linear-gradient(180deg, #2a0f12 0%, #160a0c 100%);
+        box-shadow: 0 0 0 1px rgba(255,46,46,.18) inset, 0 8px 16px rgba(0,0,0,.45);
+      }
+      .stButton>button:hover { border-color:#ff2e2e; }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Header banner
+st.markdown(
+    r"""
+    <div class="aviator-ribbon">
+      <span style="font-size:20px">✈️</span>
+      <span class="aviator-title">Simulador Aviator</span>
+      <span class="aviator-badge">Ciclos de ganho/perda</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # utils
 f=lambda v:("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X",".")
 okd=lambda s: bool(re.fullmatch(r"\d{2}/\d{2}/\d{4}", (s or "").strip()))
@@ -116,7 +169,7 @@ def rhtml(df, vf, l, rt, n, rm):
     # Build compact HTML
     return (
         "<div style='width:100%'>"
-        "<table style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'>"
+        "<table class='aviator-summary' style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'>"
         "<thead><tr>"
         "<th style='text-align:left;padding:10px;background:#1f2430;font-weight:700'>Resumo até " + dt + "</th>"
         "<th style='text-align:right;padding:10px;background:#1f2430;font-weight:700'></th>"
