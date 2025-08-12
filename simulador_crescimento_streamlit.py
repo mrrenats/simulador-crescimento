@@ -61,7 +61,8 @@ def sty(df):
 
     html = styler.to_html()
     colgroup = "<colgroup><col style='width:18%'><col style='width:22%'><col style='width:30%'><col style='width:30%'></colgroup>"
-    html = html.replace("<table", "<table>" + colgroup, 1)
+    import re
+    html = re.sub(r'(<table[^>]*>)', r"\1" + colgroup, html, count=1)
     return html
 # inputs
 hj=datetime.now().strftime("%d/%m/%Y")
