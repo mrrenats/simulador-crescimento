@@ -36,7 +36,6 @@ def mpc(k):
     t=st.session_state.get(k,""); d="".join(ch for ch in t if ch.isdigit())[:6]; st.session_state[k]=(f"{int(d)},00" if d else "")
 def sty(df):
     def rs(r):
-        bg = "#063a1a" if r["Tipo"] == "Ganho" else ("#3a0b0b" if r["Tipo"] == "Perda" else "#111217")
         return [f"background-color:{bg};color:white;" for _ in r]
     base_styles = [
         {"selector": "table", "props": [("width", "100%"), ("table-layout", "fixed"), ("border-collapse", "collapse"),
@@ -78,7 +77,6 @@ def rhtml(df,vf,l,rt,n,rm):
         "<td style='padding:10px;background:#111217;text-align:right;color:"+C(rm)+"'>"+f(rm)+"%</td></tr>"
         "</tbody></table></div>"
     )
-
 
 # inputs
 hj=datetime.now().strftime("%d/%m/%Y")
@@ -128,8 +126,6 @@ if st.button("Simular estratégia 🚀") and not err and df is not None:
     else:
         vf=d["Valor (R$)"].iloc[-1]; l=vf-v0; rt=(vf/v0-1)*100 if v0>0 else 0.0; n=len(d); rm=float(d["Variação (%)"].mean()) if n>0 else 0.0
         k1,k2,k3,k4=st.columns(4); k1.metric("Valor final (R$)",f(vf)); k2.metric("Lucro/Prejuízo (R$)",f(l)); k3.metric("Retorno (%)",f"{f(rt)}%"); k4.metric("Operações",f"{n}")
-        if bg is not None: ax.imshow(bg,extent=(0,1,0,1),transform=ax.transAxes,zorder=0); lc="white"
-        else: ax.set_facecolor("#0b0d12"); lc="white"
         v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
         st.markdown("<div style='width:100%'>" + sty(v) + "</div>", unsafe_allow_html=True)
         st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
