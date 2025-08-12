@@ -2,7 +2,6 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 import pandas as pd
-from PIL import Image
 import streamlit as st
 
 # cfg
@@ -129,13 +128,8 @@ if st.button("Simular estratégia 🚀") and not err and df is not None:
     else:
         vf=d["Valor (R$)"].iloc[-1]; l=vf-v0; rt=(vf/v0-1)*100 if v0>0 else 0.0; n=len(d); rm=float(d["Variação (%)"].mean()) if n>0 else 0.0
         k1,k2,k3,k4=st.columns(4); k1.metric("Valor final (R$)",f(vf)); k2.metric("Lucro/Prejuízo (R$)",f(l)); k3.metric("Retorno (%)",f"{f(rt)}%"); k4.metric("Operações",f"{n}")
-        fig,ax=plt.subplots(figsize=(10,4)); bg=Image.open(B) if Path(B).exists() else None
         if bg is not None: ax.imshow(bg,extent=(0,1,0,1),transform=ax.transAxes,zorder=0); lc="white"
         else: ax.set_facecolor("#0b0d12"); lc="white"
-        x=pd.to_datetime(d["Data"]); y=d["Valor (R$)"].values
-        ax.plot(x,y,linewidth=2.6,color=lc,zorder=1); ax.set_xlabel("Data"); ax.set_ylabel("Banca (R$)"); ax.grid(True,alpha=.25)
-        ax.xaxis.set_major_locator(md.DayLocator(interval=15)); ax.xaxis.set_major_formatter(md.DateFormatter("%d/%m/%Y")); fig.autofmt_xdate()
-        st.pyplot(fig, use_container_width=True)
         v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
         st.markdown("<div style='width:100%'>" + sty(v) + "</div>", unsafe_allow_html=True)
         st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
