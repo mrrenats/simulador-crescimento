@@ -236,7 +236,7 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
         with container:
             st.dataframe(styled, use_container_width=True, height=520)
 
-        # ----- Resumo (HTML) — Valor final como 1ª linha em negrito e fonte levemente maior -----
+        # ----- Resumo (HTML) — Valor final como 1ª linha -----
         valor_final = df_ops["Valor (R$)"].iloc[-1]
         lucro = valor_final - valor_inicial
         retorno_pct = (valor_final / valor_inicial - 1.0) * 100.0 if valor_inicial > 0 else 0.0
@@ -248,7 +248,7 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
         retorno_color = "#16a34a" if retorno_pct >= 0 else "#dc2626"
         retorno_medio_color = "#16a34a" if retorno_medio_op >= 0 else "#dc2626"
 
-        resumo_html = f\"\"\"
+        resumo_html = f"""
         <div style='width:100%;'>
           <table style='width:100%; border-collapse:collapse; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; color:#e5e7eb;'>
             <thead>
@@ -281,6 +281,6 @@ if st.button("Simular estratégia 🚀") and not (erro or data_erro) and data_fi
             </tbody>
           </table>
         </div>
-        \"\"\"
+        """
         with container:
             st.markdown(resumo_html, unsafe_allow_html=True)
