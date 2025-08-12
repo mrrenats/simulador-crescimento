@@ -104,6 +104,36 @@ else:
     try: g,p=pp(st.session_state.get("ganho_pct_txt", g_txt)), pp(st.session_state.get("perda_pct_txt", p_txt)); cyc=cy(g,p,dg,dp,ini)
     except Exception as e: st.error(e); cyc=[]
 
+
+def rhtml(df, vf, l, rt, n, rm):
+    # Colors: green for >=0, red otherwise
+    C = (lambda x: "#16a34a" if x >= 0 else "#dc2626")
+    # Defensive: ensure Data column is datetime
+    _df = df.copy()
+    _df["Data"] = pd.to_datetime(_df["Data"])
+    dt = _df["Data"].iloc[-1].strftime("%d/%m/%Y")
+    # Build compact HTML
+    return (
+        "<div style='width:100%'>"
+        "<table style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'>"
+        "<thead><tr>"
+        "<th style='text-align:left;padding:10px;background:#1f2430;font-weight:700'>Resumo até " + dt + "</th>"
+        "<th style='text-align:right;padding:10px;background:#1f2430;font-weight:700'></th>"
+        "</tr></thead><tbody>"
+        "<tr><td style='padding:10px;background:#111217'>Valor final</td>"
+        "<td style='padding:10px;background:#111217;text-align:right'><span style='font-weight:800;font-size:17px'>R$ " + f(vf) + "</span></td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Lucro/Prejuízo</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(l) + "'>R$ " + f(l) + "</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Retorno (%)</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(rt) + "'>" + f(rt) + "%</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Nº de operações</td>"
+        "<td style='padding:10px;background:#111217;text-align:right'>" + str(n) + "</td></tr>"
+        "<tr><td style='padding:10px;background:#111217'>Retorno médio/operação</td>"
+        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(rm) + "'>" + f(rm) + "%</td></tr>"
+        "</tbody></table></div>"
+    )
+
+
 # run
 if st.button("Simular estratégia 🚀") and not err and df is not None:
     d=sim(v0,di,df,acts,cyc)
