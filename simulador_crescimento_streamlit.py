@@ -1,200 +1,121 @@
-import re
-from datetime import datetime, timedelta
-from pathlib import Path
-import pandas as pd
+# -*- coding: utf-8 -*-
+"""
+Simulador de Crescimento por Dia da Semana (sem ciclos fixos)
+----------------------------------------------------------------
+Este app substitui a lógica de ciclos de ganho/perda.
+Agora você define livremente a % (positiva ou negativa) para cada dia da semana.
+
+Como usar:
+- Preencha o capital inicial, quantidade de semanas e, se quiser, marque "apenas dias úteis".
+- Informe a % de cada dia da semana (ex.: 7,12 para +7,12% | -15,2 para -15,2%).
+- O app compõe o capital aplicando a % de cada dia ao longo das semanas.
+"""
 import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
-# cfg
-T="✈️ Simulador Aviator — ganhos e perdas"; B="fundo_grafico.jpg"
-st.set_page_config(page_title=T, layout="wide"); st.title(T); st.caption("Simule ciclos de ganhos e perdas e veja a evolução da banca como se estivesse no Aviator.")
+st.set_page_config(page_title="Simulador de Crescimento", page_icon="📈", layout="centered")
 
-# ===== Aviator Theme (CSS) =====
-st.markdown(
-    r"""
-    <style>
-      /* Background: dark cockpit + subtle grid */
-      .stApp {
-        background: radial-gradient(1200px 800px at 20% -10%, rgba(255,46,46,0.12) 0%, rgba(11,13,18,0) 60%),
-                    radial-gradient(1000px 600px at 100% 20%, rgba(255,46,46,0.08) 0%, rgba(11,13,18,0) 60%),
-                    #0b0d12;
-      }
-      /* Headline ribbon */
-      .aviator-ribbon {
-        display:flex; align-items:center; gap:.6rem;
-        padding:10px 14px; border-radius:14px;
-        background: linear-gradient(90deg,#1b202b 0%, #151923 100%);
-        border:1px solid rgba(255,46,46,.25);
-        box-shadow: 0 0 0 1px rgba(255,46,46,.08) inset, 0 8px 24px rgba(0,0,0,.45);
-      }
-      .aviator-title { font-weight:800; letter-spacing:.3px; }
-      .aviator-badge {
-        padding:2px 8px; border-radius:999px; font-size:.75rem;
-        background: rgba(255,46,46,.14); border:1px solid rgba(255,46,46,.35); color:#ff7a7a;
-      }
-      /* KPI cards spacing */
-      section[data-testid="stHorizontalBlock"] > div { gap: .6rem }
-      /* Table & Summary coherence */
-      .aviator-summary th { background:#171b25 !important; color:#ffffff !important; }
-      .aviator-summary td { background:#0f1219 !important; color:#e5e7eb !important; }
-      /* Buttons */
-      .stButton>button {
-        border-radius:12px; border:1px solid rgba(255,46,46,.35);
-        background: linear-gradient(180deg, #2a0f12 0%, #160a0c 100%);
-        box-shadow: 0 0 0 1px rgba(255,46,46,.18) inset, 0 8px 16px rgba(0,0,0,.45);
-      }
-      .stButton>button:hover { border-color:#ff2e2e; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.title("📈 Simulador de Crescimento por Dia da Semana")
+st.caption("Defina livremente a **percentagem diária** (positiva ou negativa) para cada dia da semana. Sem ciclos fixos.")
 
-# Header banner
-st.markdown(
-    r"""
-    <div class="aviator-ribbon">
-      <span style="font-size:20px">✈️</span>
-      <span class="aviator-title">Simulador Aviator</span>
-      <span class="aviator-badge">Ciclos de ganho/perda</span>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+with st.sidebar:
+    st.header("Parâmetros gerais")
+    capital_inicial = st.number_input("Capital inicial (R$)", min_value=0.0, value=1000.0, step=100.0, format="%.2f")
+    semanas = st.number_input("Quantas semanas?", min_value=1, value=4, step=1)
+    dias_uteis_apenas = st.checkbox("Apenas dias úteis (seg–sex)?", value=True)
+    reiniciar_a_cada_semana = st.checkbox("Reiniciar capital a cada semana?", value=False, help="Se ligado, cada semana começa com o capital inicial. Se desligado, o capital é composto ao longo de todas as semanas.")
+    mostrar_grafico = st.checkbox("Mostrar gráfico de evolução", value=True)
+    st.markdown("---")
+    st.caption("Dica: use `,` como separador decimal (ex.: 7,12) ou `.` (ex.: 7.12).")
 
+st.subheader("Percentuais por dia da semana")
+st.write("Insira a variação diária em **%**. Ex.: `7,12` => **+7,12%**; `-15,2` => **-15,2%**.")
 
-# utils
-f=lambda v:("{:,.2f}".format(v)).replace(",", "X").replace(".", ",").replace("X",".")
-okd=lambda s: bool(re.fullmatch(r"\d{2}/\d{2}/\d{4}", (s or "").strip()))
-pdt=lambda s: datetime.strptime(s.strip(),"%d/%m/%Y")
-pp=lambda s: round(float((s or "").strip().replace(".","").replace(",", ".")),2) if (s or "").strip() else (_ for _ in ()).throw(ValueError("Preencha os percentuais de ganho e perda."))
-def cy(g,p,dg,dp,ini):
-    if dg<0 or dp<0: raise ValueError("Dias devem ser não negativos.")
-    if dg==0 and dp==0: raise ValueError("Defina ao menos um dia de ganho ou de perda.")
-    if g<0 or p<0: raise ValueError("Percentuais não podem ser negativos.")
-    if p>=100: raise ValueError("Perda (%) deve ser < 100.")
-    if g>500: raise ValueError("Ganho (%) muito alto (≤ 500%).")
-    fg,fp=1+g/100,1-p/100; G,P=[fg]*dg,[fp]*dp
-    return (G+P) if ini=="Ganho" else (P+G)
-def sim(v0,di,df,act,cyc):
-    v,i,d,h=v0,0,di,[]
-    while d<=df:
-        if d.weekday() in act and cyc:
-            fct=cyc[i]; v*=fct; i=(i+1)%len(cyc)
-            h.append({"Data":d,"Tipo":"Ganho"if fct>1 else("Perda"if fct<1 else"Neutro"),"Variação (%)":(fct-1)*100,"Valor (R$)":v})
-        d+=timedelta(days=1)
-    return pd.DataFrame(h)
-def mdf():
-    t=st.session_state.get("data_fim_txt",""); d="".join(ch for ch in t if ch.isdigit())[:8]
-    st.session_state["data_fim_txt"]="" if not d else d if len(d)<=2 else f"{d[:2]}/{d[2:4]}" if len(d)<=4 else f"{d[:2]}/{d[2:4]}/{d[4:]}"
-def mpc(k):
-    t=st.session_state.get(k,""); d="".join(ch for ch in t if ch.isdigit())[:6]; st.session_state[k]=(f"{int(d)},00" if d else "")
-def sty(df):
-    def rs(r):
-        bg = "#063a1a" if r["Tipo"] == "Ganho" else ("#3a0b0b" if r["Tipo"] == "Perda" else "#111217")
-        return [f"background-color:{bg};color:white;" for _ in r]
+DAYS_PT = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+DAYS_ABBR = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
-    base_styles = [
-        {"selector": "table", "props": [("width", "100%"), ("table-layout", "fixed"), ("border-collapse", "collapse"),
-                                        ("font-family", "system-ui,-apple-system,Segoe UI,Roboto,Arial"), ("color", "#e5e7eb")]},
-        {"selector": "th", "props": [("background", "#1f2430"), ("color", "white"), ("text-align", "left"), ("padding", "8px 10px")]},
-        {"selector": "td", "props": [("padding", "6px 8px")]},
-        {"selector": "td:nth-child(3)", "props": [("text-align", "right")]},
-        {"selector": "td:nth-child(4)", "props": [("text-align", "right")]},
-        {"selector": "td:nth-child(2)", "props": [("text-align", "center")]},
-        # Hide index via CSS for maximum compatibility
-        {"selector": ".row_heading, .blank", "props": [("display", "none")]},
-    ]
-
-    styler = df.style.apply(rs, axis=1).set_table_styles(base_styles)
-
-    # Try native hide if available (newer pandas)
-    try:
-        styler = styler.hide(axis="index")
-    except Exception:
-        pass  # CSS above already hides index in most versions
-
-    html = styler.to_html()
-    colgroup = "<colgroup><col style='width:18%'><col style='width:22%'><col style='width:30%'><col style='width:30%'></colgroup>"
-    import re
-    html = re.sub(r'(<table[^>]*>)', r"\1" + colgroup, html, count=1)
-    return html
-# inputs
-hj=datetime.now().strftime("%d/%m/%Y")
-c1,c2,c3=st.columns(3)
-with c1: v0=st.number_input("Banca inicial (R$)", min_value=0.0, value=200.0, step=100.0)
-with c2: di_txt=st.text_input("Início (dd/mm/aaaa)", value=hj)
-with c3: df_txt=st.text_input("Fim (dd/mm/aaaa)", value="", key="data_fim_txt", on_change=mdf)
-df_txt=st.session_state.get("data_fim_txt", df_txt)
-
-err=None; di=df=None
-if not okd(di_txt): err="Use dd/mm/aaaa, ex.: 07/08/2025."
-elif not df_txt.strip(): err="Informe a data de fim no formato dd/mm/aaaa."
-elif not okd(df_txt): err="Use dd/mm/aaaa, ex.: 07/08/2025."
-else:
-    di, df = pdt(di_txt), pdt(df_txt)
-    if di>df: err="A data de início deve ser anterior ou igual à data de fim."
-st.caption(f"Período selecionado: {di_txt} — {df_txt or '(defina a data de fim)'}")
-
-st.subheader("📅 Dias com operações", anchor=False)
-labs=["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"]; defs=[True,True,False,True,False,False,False]
-cols=st.columns(7); acts=[]
-for i,(lb,dv) in enumerate(zip(labs,defs)):
+# Inputs de percentuais por dia
+cols = st.columns(7)
+percentuais = []
+for i, day in enumerate(DAYS_PT):
     with cols[i]:
-        if st.checkbox(lb,value=dv): acts.append(i)
-if not acts: st.warning("Selecione pelo menos um dia da semana para operar.")
+        if dias_uteis_apenas and i >= 5:
+            pct = st.number_input(day, value=0.0, step=0.1, format="%.2f", key=f"pct_{i}", disabled=True)
+        else:
+            pct = st.number_input(day, value=0.0, step=0.1, format="%.2f", key=f"pct_{i}")
+        percentuais.append(pct)
 
-st.subheader("🧠 Estratégia (ciclo)", anchor=False)
-d1,d2=st.columns(2)
-with d1: dg=st.selectbox("Dias de ganho por ciclo", list(range(11)), index=2)
-with d2: dp=st.selectbox("Dias de perda por ciclo", list(range(11)), index=1)
-if dg==0 and dp==0: st.error("O ciclo não pode ter 0 dias de ganho e 0 dias de perda ao mesmo tempo."); st.stop()
-c1,c2,c3=st.columns(3)
-with c1: g_txt=st.text_input("Ganho (%)", value="20,00", key="ganho_pct_txt", on_change=lambda: mpc("ganho_pct_txt"))
-with c2: p_txt=st.text_input("Perda (%)", value="15,00", key="perda_pct_txt", on_change=lambda: mpc("perda_pct_txt"))
-with c3: ini=st.radio("Ciclo começa por:", ["Ganho","Perda"], index=0, horizontal=True)
-st.caption("Dica: digite só números; a vírgula com duas casas é automática (ex.: 15 → 15,00).")
+if dias_uteis_apenas:
+    percentuais[5] = 0.0
+    percentuais[6] = 0.0
 
-if err: st.error(err); cyc=[]
-else:
-    try: g,p=pp(st.session_state.get("ganho_pct_txt", g_txt)), pp(st.session_state.get("perda_pct_txt", p_txt)); cyc=cy(g,p,dg,dp,ini)
-    except Exception as e: st.error(e); cyc=[]
+# --- Simulação ---
+registros = []
+capital = capital_inicial
+dia_global = 0
 
+for semana in range(1, int(semanas) + 1):
+    if reiniciar_a_cada_semana and semana > 1:
+        capital = capital_inicial
+    for dia_semana in range(7):
+        if dias_uteis_apenas and dia_semana >= 5:
+            continue
+        pct = percentuais[dia_semana]
+        delta = capital * (pct / 100.0)
+        capital_final = capital + delta
+        registros.append({
+            "Semana": semana,
+            "Dia #": dia_global + 1,
+            "Dia da semana": DAYS_PT[dia_semana],
+            "% do dia": pct,
+            "Variação (R$)": delta,
+            "Capital (início do dia)": capital,
+            "Capital (fim do dia)": capital_final,
+        })
+        capital = capital_final
+        dia_global += 1
 
-def rhtml(df, vf, l, rt, n, rm):
-    # Colors: green for >=0, red otherwise
-    C = (lambda x: "#16a34a" if x >= 0 else "#dc2626")
-    # Defensive: ensure Data column is datetime
-    _df = df.copy()
-    _df["Data"] = pd.to_datetime(_df["Data"])
-    dt = _df["Data"].iloc[-1].strftime("%d/%m/%Y")
-    # Build compact HTML
-    return (
-        "<div style='width:100%'>"
-        "<table class='aviator-summary' style='width:100%;border-collapse:collapse;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:#e5e7eb'>"
-        "<thead><tr>"
-        "<th style='text-align:left;padding:10px;background:#1f2430;font-weight:700'>Resumo até " + dt + "</th>"
-        "<th style='text-align:right;padding:10px;background:#1f2430;font-weight:700'></th>"
-        "</tr></thead><tbody>"
-        "<tr><td style='padding:10px;background:#111217'>Valor final</td>"
-        "<td style='padding:10px;background:#111217;text-align:right'><span style='font-weight:800;font-size:17px'>R$ " + f(vf) + "</span></td></tr>"
-        "<tr><td style='padding:10px;background:#111217'>Lucro/Prejuízo</td>"
-        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(l) + "'>R$ " + f(l) + "</td></tr>"
-        "<tr><td style='padding:10px;background:#111217'>Retorno (%)</td>"
-        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(rt) + "'>" + f(rt) + "%</td></tr>"
-        "<tr><td style='padding:10px;background:#111217'>Nº de operações</td>"
-        "<td style='padding:10px;background:#111217;text-align:right'>" + str(n) + "</td></tr>"
-        "<tr><td style='padding:10px;background:#111217'>Retorno médio/operação</td>"
-        "<td style='padding:10px;background:#111217;text-align:right;color:" + C(rm) + "'>" + f(rm) + "%</td></tr>"
-        "</tbody></table></div>"
+df = pd.DataFrame(registros)
+
+# --- Resultados ---
+st.subheader("Resultados")
+col1, col2, col3 = st.columns(3)
+total_dias = len(df)
+capital_final_total = df["Capital (fim do dia)"].iloc[-1] if total_dias > 0 else capital_inicial
+retorno_acumulado_pct = ((capital_final_total / capital_inicial - 1) * 100.0) if capital_inicial > 0 else 0.0
+
+col1.metric("Dias simulados", f"{total_dias}")
+col2.metric("Capital final", f"R$ {capital_final_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+col3.metric("Retorno acumulado", f"{retorno_acumulado_pct:.2f}%")
+
+if total_dias > 0:
+    st.dataframe(
+        df.style.format({
+            "% do dia": "{:.2f}%",
+            "Variação (R$)": "R$ {:,.2f}",
+            "Capital (início do dia)": "R$ {:,.2f}",
+            "Capital (fim do dia)": "R$ {:,.2f}",
+        }).highlight_null(props="opacity: 0.6;"),
+        use_container_width=True
     )
+else:
+    st.info("Configure os percentuais e as semanas para visualizar a tabela.")
 
+# --- Gráfico ---
+if mostrar_grafico and total_dias > 0:
+    st.subheader("Evolução do capital")
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    ax.plot(df["Dia #"], df["Capital (fim do dia)"])
+    ax.set_xlabel("Dia")
+    ax.set_ylabel("Capital (R$)")
+    ax.set_title("Evolução do capital ao longo dos dias")
+    st.pyplot(fig)
 
-# run
-if st.button("Simular estratégia 🚀") and not err and df is not None:
-    d=sim(v0,di,df,acts,cyc)
-    if d.empty: st.warning("Nenhum dia de operação dentro do período/dias escolhidos.")
-    else:
-        vf=d["Valor (R$)"].iloc[-1]; l=vf-v0; rt=(vf/v0-1)*100 if v0>0 else 0.0; n=len(d); rm=float(d["Variação (%)"].mean()) if n>0 else 0.0
-        k1,k2,k3,k4=st.columns(4); k1.metric("Valor final (R$)",f(vf)); k2.metric("Lucro/Prejuízo (R$)",f(l)); k3.metric("Retorno (%)",f"{f(rt)}%"); k4.metric("Operações",f"{n}")
-        v=d.copy(); v["Data"]=pd.to_datetime(v["Data"]).dt.strftime("%d/%m/%Y"); v["Variação (%)"]=v["Variação (%)"].map(lambda x:f"{f(x)}%"); v["Valor (R$)"]=v["Valor (R$)"].map(lambda x:f"R$ {f(x)}"); v=v[["Data","Tipo","Variação (%)","Valor (R$)"]].reset_index(drop=True)
-        st.markdown("<div style='width:100%'>" + sty(v) + "</div>", unsafe_allow_html=True)
-        st.markdown(rhtml(d,vf,l,rt,n,rm), unsafe_allow_html=True)
+# --- Exportação ---
+st.subheader("Exportar dados")
+csv = df.to_csv(index=False).encode("utf-8")
+st.download_button("Baixar CSV", data=csv, file_name="simulacao_por_dia_da_semana.csv", mime="text/csv")
+
+st.caption("ⓘ Este simulador não é recomendação financeira. Use para estudos e planejamento.")
