@@ -2,33 +2,30 @@
 """
 Simulador de Ganhos e Perdas do Aviator
 ---------------------------------------
-Agora com campos de data usando st.date_input.
+Agora com calendário (date_input) em Português do Brasil.
 """
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import date, datetime, timedelta
+import locale
+import os
+
+# Forçar locale pt-BR (funciona em Linux/Mac/Windows com tentativas em cascata)
+_LOCALE_CANDIDATES = ["pt_BR.UTF-8", "pt_BR.utf8", "pt_BR", "Portuguese_Brazil.1252"]
+_applied_locale = None
+for loc in _LOCALE_CANDIDATES:
+    try:
+        locale.setlocale(locale.LC_TIME, loc)
+        os.environ["LC_TIME"] = loc  # ajuda algumas distros
+        _applied_locale = loc
+        break
+    except Exception:
+        continue
+# (Opcional) poderíamos exibir um aviso se não aplicar, mas evitamos poluir a UI.
 
 st.set_page_config(page_title="Simulador de Ganhos e Perdas do Aviator", page_icon="✈️", layout="wide")
-
-# ----------------------
-# Estilo Aviator (CSS)
-# ----------------------
-st.markdown("""
-<style>
-html, body, [data-testid="stAppViewContainer"] {
-  background: radial-gradient(1200px 600px at 10% 10%, #1b1b1f 0%, #0f0f12 60%, #0b0b0d 100%) !important;
-  color: #f0f2f6 !important;
-}
-[data-testid="stSidebar"] {
-  background: linear-gradient(180deg, #111115 0%, #0b0b0d 100%) !important;
-  border-right: 1px solid rgba(255, 0, 0, 0.15);
-}
-h1 { font-weight: 800 !important; color: #ff2d2d !important; text-shadow: 0 0 18px rgba(255,45,45,0.25); }
-h2, h3 { color: #ff6961 !important; }
-</style>
-""", unsafe_allow_html=True)
 
 st.title("Simulador de Ganhos e Perdas do Aviator")
 
@@ -36,10 +33,10 @@ with st.sidebar:
     st.header("Parâmetros gerais ✈️")
     banca_inicial = st.number_input("Banca inicial (R$)", min_value=0.0, value=1000.0, step=100.0, format="%.2f")
     hoje = date.today()
+    # Campos de data com calendário pt-BR; usuário pode digitar 21082025 -> 21/08/2025
     data_inicio = st.date_input("Data de início da operação", value=hoje, format="DD/MM/YYYY")
     data_fim = st.date_input("Data final", value=None, format="DD/MM/YYYY")
 
-# Dias abreviados
 DAYS_ABBR = ["SEG", "TER", "QUA", "QUI", "SEX", "SÁB", "DOM"]
 
 st.subheader("Percentuais por dia")
@@ -66,6 +63,7 @@ if data_fim < data_inicio:
     st.error("A **Data final** deve ser igual ou posterior à **Data de início da operação**.")
     st.stop()
 
+# Período contínuo
 datas_periodo = pd.date_range(start=data_inicio, end=data_fim, freq="D")
 
 # --- Simulação ---
@@ -114,19 +112,39 @@ if len(df) > 0:
     st.write(f"Dias positivos: {dias_pos} | Dias negativos: {dias_neg}")
 
     st.subheader("Tabela de operações")
-    st.dataframe(df, use_container_width=True)
+    # Colorir linhas verde/vermelho
+    def color_rows(row):
+        delta = row.get("Variação (R$)", 0.0)
+        if delta > 0:
+            return ["background-color: #16381b; color: #9be7a3;"] * len(row)
+        elif delta < 0:
+            return ["background-color: #3a0f12; color: #ff9aa2;"] * len(row)
+        else:
+            return [""] * len(row)
+    table_styles = [
+        {'selector': 'th.col_heading', 'props': [('text-align', 'center')]},
+        {'selector': 'th.index_name', 'props': [('text-align', 'center')]},
+        {'selector': 'th.blank', 'props': [('text-align', 'center')]},
+    ]
+    styled = (df.style
+              .set_table_styles(table_styles)
+              .apply(color_rows, axis=1)
+              .format({
+                  "% 1": "{:.2f}%",
+                  "% 2": "{:.2f}%",
+                  "% do dia (total)": "{:.2f}%",
+                  "Variação (R$)": "R$ {:,.2f}",
+                  "Capital (início do dia)": "R$ {:,.2f}",
+                  "Capital (fim do dia)": "R$ {:,.2f}",
+              }))
+    st.dataframe(styled, use_container_width=True)
 
     st.subheader("Evolução da Banca")
     fig, ax = plt.subplots(figsize=(10, 4.8))
     ax.plot(pd.to_datetime(df["Data"], format="%d/%m/%Y"), df["Capital (fim do dia)"], linewidth=2.0, color="#ff2d2d")
-    ax.set_facecolor("#0f0f12")
-    fig.patch.set_facecolor("#0f0f12")
-    ax.tick_params(colors="#f0f2f6")
-    ax.spines['bottom'].set_color("#f0f2f6")
-    ax.spines['left'].set_color("#f0f2f6")
-    ax.set_xlabel("Data", color="#f0f2f6")
-    ax.set_ylabel("Banca (R$)", color="#f0f2f6")
-    ax.set_title("Evolução da Banca", color="#ff6961")
+    ax.set_xlabel("Data")
+    ax.set_ylabel("Banca (R$)")
+    ax.set_title("Evolução da Banca")
     fig.autofmt_xdate()
     st.pyplot(fig)
 else:
