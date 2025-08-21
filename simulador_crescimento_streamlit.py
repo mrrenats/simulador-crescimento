@@ -142,31 +142,39 @@ banca_final_total = df["Capital (fim do dia)"].iloc[-1] if total_dias > 0 else b
 retorno_acumulado_pct = ((banca_final_total / banca_inicial - 1) * 100.0) if banca_inicial > 0 else 0.0
 lucro_prejuizo = banca_final_total - banca_inicial
 
+
+# Montar "Resultados" como tabela uniforme (mantendo numéricos e formatando via Styler)
 resumo_dict = {
     "Dias simulados": [total_dias],
-    "Banca final": [f"R$ {banca_final_total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")],
-    "Retorno acumulado": [f"{retorno_acumulado_pct:.2f}%"],
+    "Banca final": [banca_final_total],
+    "Retorno acumulado": [retorno_acumulado_pct],
     "Lucro/Prejuízo do período": [lucro_prejuizo],
 }
 resumo_df = pd.DataFrame(resumo_dict)
 
-def color_lucro(val):
-    if isinstance(val, (int, float)):
-        if val > 0:  # verde
-            return "color: #9be7a3; font-weight: 700;"
-        elif val < 0:  # vermelho
-            return "color: #ff9aa2; font-weight: 700;"
-    return ""
+def fmt_real(v):
+    try:
+        return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return v
 
 styled_resumo = (resumo_df.style
-                 .format({"Lucro/Prejuízo do período": "R$ {:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")})
-                 .applymap(color_lucro, subset=["Lucro/Prejuízo do período"])
+                 .format({
+                     "Banca final": fmt_real,
+                     "Retorno acumulado": lambda v: f"{v:.2f}%",
+                     "Lucro/Prejuízo do período": fmt_real,
+                 })
+                 .applymap(lambda v: "color: #9be7a3; font-weight: 700;" if isinstance(v, (int, float)) and v > 0 else
+                                   ("color: #ff9aa2; font-weight: 700;" if isinstance(v, (int, float)) and v < 0 else ""),
+                           subset=["Lucro/Prejuízo do período"])
                  .set_table_styles([
                      {'selector': 'th.col_heading', 'props': [('text-align', 'center')]},
                      {'selector': 'th.index_name', 'props': [('text-align', 'center')]},
                      {'selector': 'th.blank', 'props': [('text-align', 'center')]},
                  ]))
-st.dataframe(styled_resumo, use_container_width=True, hide_index=True)
+# Mostrar sem índice
+st.dataframe(styled_resumo, use_container_width=True)
+
 
 # ------------- Resumo por período (positivos/negativos) -------------
 st.markdown("#### Resumo por período")
