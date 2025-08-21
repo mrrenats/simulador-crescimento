@@ -6,8 +6,8 @@ Simulador de Ganhos e Perdas do Aviator
 - Datas via st.date_input (locale pt-BR; digite números e formata em DD/MM/AAAA).
 - Gráfico com fundo preto, linha vermelha, e eixos brancos; título fora do gráfico.
 - Tabela esconde dias sem variação (delta == 0).
-- "Resultados" como tabela uniforme; "Lucro/Prejuízo do período" colorido (verde/vermelho).
-- "Resumo por período" com totais em fonte maior (verde para positivos, vermelho para negativos).
+- "Resultados" em 4 blocos com fonte grande (34px) igual ao "Resumo por período".
+- "Resumo por período" foi movido para a barra lateral, abaixo de "Data final".
 """
 import streamlit as st
 import pandas as pd
@@ -15,9 +15,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 from datetime import date, datetime, timedelta
-import matplotlib as mpl
-import locale
-import os
+import locale, os
 
 # ------------- Locale pt-BR -------------
 _LOCALE_CANDIDATES = ["pt_BR.UTF-8", "pt_BR.utf8", "pt_BR", "Portuguese_Brazil.1252"]
@@ -54,11 +52,13 @@ h2, h3 { color: #ff6961 !important; }
   display:inline-block; padding:6px 10px; border:1px solid rgba(255,45,45,0.35);
   border-radius:999px; margin-bottom:6px; font-weight:700; color:#ffd6d6; background:rgba(255,45,45,0.08);
 }
-/* Caixas de métrica/summary */
+/* Caixas de destaque */
 .metric-box {
   border-radius: 14px; padding: 12px 14px; border: 1px solid rgba(255,45,45,0.25);
   background: linear-gradient(180deg, rgba(255,45,45,0.10) 0%, rgba(255,45,45,0.02) 100%);
 }
+.metric-label { font-size:14px; color:#b8bcc6; text-align:center; }
+.metric-value { font-size:34px; font-weight:900; text-align:center; }
 .metric-green { color:#9be7a3; }
 .metric-red { color:#ff9aa2; }
 /* DataFrame: borda + cabeçalho centralizado */
@@ -72,7 +72,7 @@ h2, h3 { color: #ff6961 !important; }
 
 st.title("Simulador de Ganhos e Perdas do Aviator")
 
-# ------------- Sidebar -------------
+# ------------- Sidebar (Parâmetros) -------------
 with st.sidebar:
     st.header("Parâmetros gerais ✈️")
     banca_inicial = st.number_input("Banca inicial (R$)", min_value=0.0, value=1000.0, step=100.0, format="%.2f")
@@ -102,10 +102,12 @@ for i, day in enumerate(DAYS_ABBR):
 
 # ------------- Validação de datas -------------
 if data_fim is None:
-    st.info("Informe a **Data final** para rodar a simulação.")
+    with st.sidebar:
+        st.info("Informe a **Data final** para rodar a simulação.")
     st.stop()
 if data_fim < data_inicio:
-    st.error("A **Data final** deve ser igual ou posterior à **Data de início da operação**.")
+    with st.sidebar:
+        st.error("A **Data final** deve ser igual ou posterior à **Data de início da operação**.")
     st.stop()
 
 # ------------- Simulação -------------
@@ -135,67 +137,60 @@ for current_date in datas_periodo:
 
 df = pd.DataFrame(registros)
 
-# ------------- Resultados (como tabela uniforme) -------------
+# ------------- Resumo por período (na barra lateral) -------------
+with st.sidebar:
+    st.markdown("### Resumo por período")
+    if not df.empty:
+        dias_pos = int((df["Variação (R$)"] > 0).sum())
+        dias_neg = int((df["Variação (R$)"] < 0).sum())
+        st.markdown(f"""
+        <div class="metric-box" style="text-align:center; margin-bottom:8px;">
+          <div class="metric-label">Dias positivos</div>
+          <div class="metric-value metric-green">{dias_pos}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="metric-box" style="text-align:center;">
+          <div class="metric-label">Dias negativos</div>
+          <div class="metric-value metric-red">{dias_neg}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("Sem dados para resumir ainda.")
+
+# ------------- Resultados (4 blocos com fonte 34px) -------------
 st.subheader("Resultados")
 total_dias = len(df)
 banca_final_total = df["Capital (fim do dia)"].iloc[-1] if total_dias > 0 else banca_inicial
 retorno_acumulado_pct = ((banca_final_total / banca_inicial - 1) * 100.0) if banca_inicial > 0 else 0.0
 lucro_prejuizo = banca_final_total - banca_inicial
 
-
-# Montar "Resultados" como tabela uniforme (mantendo numéricos e formatando via Styler)
-resumo_dict = {
-    "Dias simulados": [total_dias],
-    "Banca final": [banca_final_total],
-    "Retorno acumulado": [retorno_acumulado_pct],
-    "Lucro/Prejuízo do período": [lucro_prejuizo],
-}
-resumo_df = pd.DataFrame(resumo_dict)
-
-def fmt_real(v):
-    try:
-        return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except Exception:
-        return v
-
-styled_resumo = (resumo_df.style
-                 .format({
-                     "Banca final": fmt_real,
-                     "Retorno acumulado": lambda v: f"{v:.2f}%",
-                     "Lucro/Prejuízo do período": fmt_real,
-                 })
-                 .applymap(lambda v: "color: #9be7a3; font-weight: 700;" if isinstance(v, (int, float)) and v > 0 else
-                                   ("color: #ff9aa2; font-weight: 700;" if isinstance(v, (int, float)) and v < 0 else ""),
-                           subset=["Lucro/Prejuízo do período"])
-                 .set_table_styles([
-                     {'selector': 'th.col_heading', 'props': [('text-align', 'center')]},
-                     {'selector': 'th.index_name', 'props': [('text-align', 'center')]},
-                     {'selector': 'th.blank', 'props': [('text-align', 'center')]},
-                 ]))
-# Mostrar sem índice
-st.dataframe(styled_resumo, use_container_width=True)
-
-
-# ------------- Resumo por período (positivos/negativos) -------------
-st.markdown("#### Resumo por período")
-if total_dias > 0:
-    dias_pos = int((df["Variação (R$)"] > 0).sum())
-    dias_neg = int((df["Variação (R$)"] < 0).sum())
-    rp1, rp2 = st.columns(2)
-    rp1.markdown(f"""
-    <div class="metric-box" style="text-align:center">
-      <div style="font-size:14px;color:#b8bcc6">Dias positivos</div>
-      <div class="metric-green" style="font-size:34px;font-weight:900">{dias_pos}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    rp2.markdown(f"""
-    <div class="metric-box" style="text-align:center">
-      <div style="font-size:14px;color:#b8bcc6">Dias negativos</div>
-      <div class="metric-red" style="font-size:34px;font-weight:900">{dias_neg}</div>
-    </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info("Sem dados para resumir ainda.")
+colR1, colR2, colR3, colR4 = st.columns(4)
+colR1.markdown(f"""
+<div class="metric-box">
+  <div class="metric-label">Dias simulados</div>
+  <div class="metric-value">{total_dias}</div>
+</div>
+""", unsafe_allow_html=True)
+colR2.markdown(f"""
+<div class="metric-box">
+  <div class="metric-label">Banca final</div>
+  <div class="metric-value">R$ {banca_final_total:,.2f}</div>
+</div>
+""".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
+colR3.markdown(f"""
+<div class="metric-box">
+  <div class="metric-label">Retorno acumulado</div>
+  <div class="metric-value">{retorno_acumulado_pct:.2f}%</div>
+</div>
+""", unsafe_allow_html=True)
+lp_color_class = "metric-green" if lucro_prejuizo >= 0 else "metric-red"
+colR4.markdown(f"""
+<div class="metric-box">
+  <div class="metric-label">Lucro/Prejuízo do período</div>
+  <div class="metric-value {lp_color_class}">R$ {lucro_prejuizo:,.2f}</div>
+</div>
+""".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
 
 # ------------- Tabela de operações (sem linhas com delta=0) -------------
 st.subheader("Tabela de operações")
@@ -237,26 +232,17 @@ else:
 # ------------- Gráfico (Evolução da Banca) -------------
 if total_dias > 0:
     st.subheader("Evolução da Banca")
-    # Preparar datas como datetime para formatação DD/MM/AAAA
     x_dates = pd.to_datetime(df["Data"], format="%d/%m/%Y")
-
     fig, ax = plt.subplots(figsize=(11, 5.2))
-    # Fundo preto
     fig.patch.set_facecolor("#000000")
     ax.set_facecolor("#000000")
-    # Linha vermelha
     ax.plot(x_dates, df["Capital (fim do dia)"], linewidth=2.2, color="#ff2d2d")
-    # Eixos brancos
     ax.tick_params(colors="#ffffff")
     ax.spines['bottom'].set_color("#ffffff")
     ax.spines['left'].set_color("#ffffff")
     ax.set_xlabel("Data", color="#ffffff")
     ax.set_ylabel("Banca (R$)", color="#ffffff")
-    # Formatador de data DD/MM/AAAA
+    from matplotlib.dates import DateFormatter
     ax.xaxis.set_major_formatter(DateFormatter("%d/%m/%Y"))
     fig.autofmt_xdate()
-
-    # Sem título dentro do gráfico (somente o subheader acima)
-    # ax.set_title("")
-
     st.pyplot(fig)
